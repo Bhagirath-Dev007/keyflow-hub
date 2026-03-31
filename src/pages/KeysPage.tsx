@@ -10,10 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Download, Copy, Search, Ban, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, Download, Copy, Search, Ban, RotateCcw, Trash2, Monitor } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import type { Database } from '@/integrations/supabase/types';
 
-type LicenseKey = Database['public']['Tables']['license_keys']['Row'];
+type LicenseKey = Database['public']['Tables']['license_keys']['Row'] & {
+  device_limit?: number;
+  device_ids?: string[];
+};
 type KeyStatus = Database['public']['Enums']['key_status'];
 
 function generateKey(): string {
@@ -33,6 +37,9 @@ export default function KeysPage() {
   const [genPlan, setGenPlan] = useState('');
   const [genDuration, setGenDuration] = useState('30');
   const [genCount, setGenCount] = useState('1');
+  const [genDeviceLimit, setGenDeviceLimit] = useState('1');
+  const [genCustomKey, setGenCustomKey] = useState('');
+  const [useCustomKey, setUseCustomKey] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
   const [activateKey, setActivateKey] = useState('');
   const { toast } = useToast();
@@ -42,7 +49,7 @@ export default function KeysPage() {
     if (role === 'user') query = query.eq('assigned_to', user!.id);
     if (role === 'reseller') query = query.eq('created_by', user!.id);
     const { data } = await query;
-    if (data) setKeys(data);
+    if (data) setKeys(data as LicenseKey[]);
   };
 
   useEffect(() => { if (user) fetchKeys(); }, [user, role]);
@@ -55,19 +62,31 @@ export default function KeysPage() {
 
   const handleGenerate = async () => {
     if (!genPlan) return;
-    const count = parseInt(genCount) || 1;
+    const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
     const duration = parseInt(genDuration) || 30;
+    const deviceLimit = parseInt(genDeviceLimit) || 1;
+
+    if (useCustomKey && !genCustomKey.trim()) {
+      toast({ title: 'Please enter a custom key', variant: 'destructive' });
+      return;
+    }
+
     const newKeys = Array.from({ length: count }, () => ({
-      key: generateKey(),
+      key: useCustomKey ? genCustomKey.trim() : generateKey(),
       plan_name: genPlan,
       duration_days: duration,
       created_by: user!.id,
+      device_limit: deviceLimit,
     }));
+
     const { error } = await supabase.from('license_keys').insert(newKeys);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      return;
+    }
     toast({ title: `${count} key(s) generated` });
     setGenerateOpen(false);
-    setGenPlan(''); setGenCount('1');
+    setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1');
     fetchKeys();
   };
 
@@ -125,6 +144,7 @@ export default function KeysPage() {
     toast({ title: 'Key reactivated!' });
     fetchKeys();
   };
+
   const handleDeleteKey = async (id: string) => {
     if (!confirm('Are you sure you want to permanently delete this key?')) return;
     const { error } = await supabase.from('license_keys').delete().eq('id', id);
@@ -143,8 +163,11 @@ export default function KeysPage() {
   };
 
   const exportCSV = () => {
-    const header = 'Key,Plan,Duration,Status,Device ID,Created At,Expires At\n';
-    const rows = filtered.map(k => `${k.key},${k.plan_name},${k.duration_days},${k.status},${k.device_id || ''},${k.created_at},${k.expires_at || ''}`).join('\n');
+    const header = 'Key,Plan,Duration,Status,Device Limit,Devices,Created At,Expires At\n';
+    const rows = filtered.map(k => {
+      const devices = (k.device_ids || []).join('; ');
+      return `${k.key},${k.plan_name},${k.duration_days},${k.status},${k.device_limit || 1},${devices},${k.created_at},${k.expires_at || ''}`;
+    }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'license_keys.csv'; a.click();
   };
@@ -189,6 +212,7 @@ export default function KeysPage() {
                 <TableHead>Key</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead>Devices</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Expires</TableHead>
                 <TableHead>Actions</TableHead>
@@ -200,6 +224,12 @@ export default function KeysPage() {
                   <TableCell className="font-mono text-sm">{k.key}</TableCell>
                   <TableCell>{k.plan_name}</TableCell>
                   <TableCell>{k.duration_days}d</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm">{(k.device_ids || []).length}/{k.device_limit || 1}</span>
+                    </div>
+                  </TableCell>
                   <TableCell><Badge variant={statusColor(k.status)} className="capitalize">{k.status}</Badge></TableCell>
                   <TableCell className="text-sm">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : '—'}</TableCell>
                   <TableCell className="flex gap-1">
@@ -217,7 +247,7 @@ export default function KeysPage() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -226,12 +256,43 @@ export default function KeysPage() {
 
       {/* Generate Keys Dialog */}
       <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Generate License Keys</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2"><Label>Plan Name</Label><Input value={genPlan} onChange={e => setGenPlan(e.target.value)} placeholder="e.g. Premium" /></div>
-            <div className="space-y-2"><Label>Duration (days)</Label><Input type="number" value={genDuration} onChange={e => setGenDuration(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Count</Label><Input type="number" min="1" max="100" value={genCount} onChange={e => setGenCount(e.target.value)} /></div>
+            <div className="flex items-center justify-between">
+              <Label>Custom Key</Label>
+              <Switch checked={useCustomKey} onCheckedChange={setUseCustomKey} />
+            </div>
+            {useCustomKey ? (
+              <div className="space-y-2">
+                <Label>Enter Custom Key</Label>
+                <Input value={genCustomKey} onChange={e => setGenCustomKey(e.target.value)} placeholder="MY-CUSTOM-KEY-2025" className="font-mono" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Count</Label>
+                <Input type="number" min="1" max="100" value={genCount} onChange={e => setGenCount(e.target.value)} />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Plan Name</Label>
+              <Input value={genPlan} onChange={e => setGenPlan(e.target.value)} placeholder="e.g. Premium" />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration (days)</Label>
+              <Input type="number" value={genDuration} onChange={e => setGenDuration(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Device Limit</Label>
+              <Select value={genDeviceLimit} onValueChange={setGenDeviceLimit}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 5, 7, 10, 25, 50, 100, 500].map(n => (
+                    <SelectItem key={n} value={String(n)}>{n} device{n > 1 ? 's' : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter><Button onClick={handleGenerate}>Generate</Button></DialogFooter>
         </DialogContent>

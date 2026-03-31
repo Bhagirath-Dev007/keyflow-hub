@@ -195,8 +195,14 @@ export default function KeysPage() {
                   <TableCell>{k.duration_days}d</TableCell>
                   <TableCell><Badge variant={statusColor(k.status)} className="capitalize">{k.status}</Badge></TableCell>
                   <TableCell className="text-sm">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : '—'}</TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)}><Copy className="h-4 w-4" /></Button>
+                  <TableCell className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)} title="Copy key"><Copy className="h-4 w-4" /></Button>
+                    {(role === 'admin' || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeactivate(k.id)} title="Revoke key"><Ban className="h-4 w-4" /></Button>
+                    )}
+                    {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
+                      <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate key"><RotateCcw className="h-4 w-4" /></Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

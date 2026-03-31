@@ -125,8 +125,15 @@ export default function KeysPage() {
     toast({ title: 'Key reactivated!' });
     fetchKeys();
   };
+  const handleDeleteKey = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this key?')) return;
+    const { error } = await supabase.from('license_keys').delete().eq('id', id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key deleted' });
+    fetchKeys();
+  };
 
-  const statusColor = (s: KeyStatus) => {
+
     switch (s) {
       case 'active': return 'default';
       case 'expired': return 'destructive';

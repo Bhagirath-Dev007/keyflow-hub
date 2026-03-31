@@ -94,6 +94,21 @@ export default function UsersPage() {
     fetchUsers();
   };
 
+  const handleDeleteUser = async (u: UserWithRole) => {
+    if (!confirm(`Are you sure you want to permanently delete user "${u.name || u.email}"? This will remove their profile, role, transactions, and activity logs.`)) return;
+    // Delete related data first, then profile and role
+    await Promise.all([
+      supabase.from('transactions').delete().eq('user_id', u.user_id),
+      supabase.from('activity_logs').delete().eq('user_id', u.user_id),
+      supabase.from('license_keys').delete().eq('assigned_to', u.user_id),
+    ]);
+    await supabase.from('user_roles').delete().eq('user_id', u.user_id);
+    const { error } = await supabase.from('profiles').delete().eq('user_id', u.user_id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'User deleted' });
+    fetchUsers();
+  };
+
   const exportCSV = () => {
     const header = 'Name,Email,Role,Balance,Banned\n';
     const rows = filtered.map(u => `${u.name},${u.email},${u.role},${u.wallet_balance},${u.is_banned}`).join('\n');

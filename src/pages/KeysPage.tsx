@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Download, Copy, Search, Ban, RotateCcw } from 'lucide-react';
+import { Plus, Download, Copy, Search, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type LicenseKey = Database['public']['Tables']['license_keys']['Row'];

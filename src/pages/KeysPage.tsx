@@ -106,6 +106,26 @@ export default function KeysPage() {
     toast({ title: 'Key copied!' });
   };
 
+  const handleDeactivate = async (id: string) => {
+    const { error } = await supabase.from('license_keys').update({ status: 'revoked' as KeyStatus }).eq('id', id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key revoked successfully' });
+    fetchKeys();
+  };
+
+  const handleReactivate = async (k: LicenseKey) => {
+    const now = new Date();
+    const expiry = new Date(now.getTime() + k.duration_days * 86400000);
+    const { error } = await supabase.from('license_keys').update({
+      status: 'active' as KeyStatus,
+      activated_at: now.toISOString(),
+      expires_at: expiry.toISOString(),
+    }).eq('id', k.id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key reactivated!' });
+    fetchKeys();
+  };
+
   const statusColor = (s: KeyStatus) => {
     switch (s) {
       case 'active': return 'default';

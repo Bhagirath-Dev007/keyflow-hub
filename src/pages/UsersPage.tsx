@@ -178,6 +178,9 @@ export default function UsersPage() {
                       <Button size="sm" variant={u.is_banned ? 'default' : 'destructive'} onClick={() => handleBanToggle(u)}>
                         {u.is_banned ? 'Unban' : 'Ban'}
                       </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteUser(u)} title="Delete user">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

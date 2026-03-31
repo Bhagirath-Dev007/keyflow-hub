@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Download, Copy, Search } from 'lucide-react';
+import { Plus, Download, Copy, Search, Ban, RotateCcw } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type LicenseKey = Database['public']['Tables']['license_keys']['Row'];
@@ -106,6 +106,26 @@ export default function KeysPage() {
     toast({ title: 'Key copied!' });
   };
 
+  const handleDeactivate = async (id: string) => {
+    const { error } = await supabase.from('license_keys').update({ status: 'revoked' as KeyStatus }).eq('id', id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key revoked successfully' });
+    fetchKeys();
+  };
+
+  const handleReactivate = async (k: LicenseKey) => {
+    const now = new Date();
+    const expiry = new Date(now.getTime() + k.duration_days * 86400000);
+    const { error } = await supabase.from('license_keys').update({
+      status: 'active' as KeyStatus,
+      activated_at: now.toISOString(),
+      expires_at: expiry.toISOString(),
+    }).eq('id', k.id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key reactivated!' });
+    fetchKeys();
+  };
+
   const statusColor = (s: KeyStatus) => {
     switch (s) {
       case 'active': return 'default';
@@ -175,8 +195,14 @@ export default function KeysPage() {
                   <TableCell>{k.duration_days}d</TableCell>
                   <TableCell><Badge variant={statusColor(k.status)} className="capitalize">{k.status}</Badge></TableCell>
                   <TableCell className="text-sm">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : '—'}</TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)}><Copy className="h-4 w-4" /></Button>
+                  <TableCell className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)} title="Copy key"><Copy className="h-4 w-4" /></Button>
+                    {(role === 'admin' || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeactivate(k.id)} title="Revoke key"><Ban className="h-4 w-4" /></Button>
+                    )}
+                    {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
+                      <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate key"><RotateCcw className="h-4 w-4" /></Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

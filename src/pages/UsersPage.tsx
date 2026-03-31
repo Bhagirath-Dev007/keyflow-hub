@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Plus, Minus, UserCog, Download } from 'lucide-react';
+import { Search, Plus, Minus, UserCog, Download, Trash2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -94,6 +94,21 @@ export default function UsersPage() {
     fetchUsers();
   };
 
+  const handleDeleteUser = async (u: UserWithRole) => {
+    if (!confirm(`Are you sure you want to permanently delete user "${u.name || u.email}"? This will remove their profile, role, transactions, and activity logs.`)) return;
+    // Delete related data first, then profile and role
+    await Promise.all([
+      supabase.from('transactions').delete().eq('user_id', u.user_id),
+      supabase.from('activity_logs').delete().eq('user_id', u.user_id),
+      supabase.from('license_keys').delete().eq('assigned_to', u.user_id),
+    ]);
+    await supabase.from('user_roles').delete().eq('user_id', u.user_id);
+    const { error } = await supabase.from('profiles').delete().eq('user_id', u.user_id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'User deleted' });
+    fetchUsers();
+  };
+
   const exportCSV = () => {
     const header = 'Name,Email,Role,Balance,Banned\n';
     const rows = filtered.map(u => `${u.name},${u.email},${u.role},${u.wallet_balance},${u.is_banned}`).join('\n');
@@ -162,6 +177,9 @@ export default function UsersPage() {
                       </Button>
                       <Button size="sm" variant={u.is_banned ? 'default' : 'destructive'} onClick={() => handleBanToggle(u)}>
                         {u.is_banned ? 'Unban' : 'Ban'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteUser(u)} title="Delete user">
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>

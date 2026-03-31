@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Download, Copy, Search, Ban, RotateCcw } from 'lucide-react';
+import { Plus, Download, Copy, Search, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type LicenseKey = Database['public']['Tables']['license_keys']['Row'];
@@ -125,6 +125,13 @@ export default function KeysPage() {
     toast({ title: 'Key reactivated!' });
     fetchKeys();
   };
+  const handleDeleteKey = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this key?')) return;
+    const { error } = await supabase.from('license_keys').delete().eq('id', id);
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Key deleted' });
+    fetchKeys();
+  };
 
   const statusColor = (s: KeyStatus) => {
     switch (s) {
@@ -202,6 +209,9 @@ export default function KeysPage() {
                     )}
                     {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
                       <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate key"><RotateCcw className="h-4 w-4" /></Button>
+                    )}
+                    {role === 'admin' && (
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteKey(k.id)} title="Delete key"><Trash2 className="h-4 w-4" /></Button>
                     )}
                   </TableCell>
                 </TableRow>

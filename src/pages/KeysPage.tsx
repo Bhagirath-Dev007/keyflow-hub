@@ -133,7 +133,7 @@ export default function KeysPage() {
     fetchKeys();
   };
 
-
+  const statusColor = (s: KeyStatus) => {
     switch (s) {
       case 'active': return 'default';
       case 'expired': return 'destructive';

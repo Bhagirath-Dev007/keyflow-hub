@@ -39,7 +39,7 @@ export default function Auth() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
             <KeyRound className="h-7 w-7 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight font-heading">KeyVault</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-heading">Naruto Panel</h1>
           <p className="mt-1 text-muted-foreground">License Key Management System</p>
         </div>
         <Card>

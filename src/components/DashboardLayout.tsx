@@ -53,7 +53,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary">
             <KeyRound className="h-5 w-5 text-sidebar-primary-foreground" />
           </div>
-          <span className="text-lg font-bold text-sidebar-primary-foreground font-heading">KeyVault</span>
+          <span className="text-lg font-bold text-sidebar-primary-foreground font-heading">Naruto Panel</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-2">

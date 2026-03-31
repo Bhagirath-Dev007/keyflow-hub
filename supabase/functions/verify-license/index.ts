@@ -25,7 +25,6 @@ serve(async (req) => {
       });
     }
 
-    // Find the key
     const { data: keyData, error: findErr } = await supabase
       .from('license_keys')
       .select('*')
@@ -38,14 +37,16 @@ serve(async (req) => {
       });
     }
 
-    // Check if key is revoked
     if (keyData.status === 'revoked') {
       return new Response(JSON.stringify({ valid: false, error: 'Key has been revoked' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // If unused, activate it and bind device
+    const deviceLimit = keyData.device_limit || 1;
+    const deviceIds: string[] = keyData.device_ids || [];
+
+    // If unused, activate and bind first device
     if (keyData.status === 'unused') {
       const now = new Date();
       const expiry = new Date(now.getTime() + keyData.duration_days * 86400000);
@@ -53,6 +54,7 @@ serve(async (req) => {
       await supabase.from('license_keys').update({
         status: 'active',
         device_id,
+        device_ids: [device_id],
         activated_at: now.toISOString(),
         expires_at: expiry.toISOString(),
       }).eq('id', keyData.id);
@@ -62,20 +64,15 @@ serve(async (req) => {
         status: 'active',
         plan: keyData.plan_name,
         expires_at: expiry.toISOString(),
+        device_limit: deviceLimit,
+        devices_used: 1,
         message: 'Key activated and bound to device'
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // If active, check device binding and expiry
+    // If active, check multi-device binding and expiry
     if (keyData.status === 'active') {
-      // Check device binding
-      if (keyData.device_id && keyData.device_id !== device_id) {
-        return new Response(JSON.stringify({ valid: false, error: 'Key is bound to a different device' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Check expiry
+      // Check expiry first
       if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
         await supabase.from('license_keys').update({ status: 'expired' }).eq('id', keyData.id);
         return new Response(JSON.stringify({ valid: false, error: 'Key has expired' }), {
@@ -83,16 +80,43 @@ serve(async (req) => {
         });
       }
 
-      // Bind device if not yet bound
-      if (!keyData.device_id) {
-        await supabase.from('license_keys').update({ device_id }).eq('id', keyData.id);
+      // Check if device is already registered
+      if (deviceIds.includes(device_id)) {
+        return new Response(JSON.stringify({
+          valid: true,
+          status: 'active',
+          plan: keyData.plan_name,
+          expires_at: keyData.expires_at,
+          device_limit: deviceLimit,
+          devices_used: deviceIds.length,
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+
+      // Check if device limit reached
+      if (deviceIds.length >= deviceLimit) {
+        return new Response(JSON.stringify({
+          valid: false,
+          error: `Device limit reached (${deviceLimit}). Key is already bound to ${deviceIds.length} device(s).`,
+          device_limit: deviceLimit,
+          devices_used: deviceIds.length,
+        }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Add new device
+      const updatedDevices = [...deviceIds, device_id];
+      await supabase.from('license_keys').update({
+        device_ids: updatedDevices,
+        device_id, // keep latest device in legacy field
+      }).eq('id', keyData.id);
 
       return new Response(JSON.stringify({
         valid: true,
         status: 'active',
         plan: keyData.plan_name,
         expires_at: keyData.expires_at,
+        device_limit: deviceLimit,
+        devices_used: updatedDevices.length,
+        message: 'Device registered successfully',
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

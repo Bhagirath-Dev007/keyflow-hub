@@ -203,6 +203,9 @@ export default function KeysPage() {
                     {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
                       <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate key"><RotateCcw className="h-4 w-4" /></Button>
                     )}
+                    {role === 'admin' && (
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteKey(k.id)} title="Delete key"><Trash2 className="h-4 w-4" /></Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

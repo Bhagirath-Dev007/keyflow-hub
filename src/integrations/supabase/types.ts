@@ -45,6 +45,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           device_id: string | null
+          device_ids: string[]
+          device_limit: number
           duration_days: number
           expires_at: string | null
           id: string
@@ -58,6 +60,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           device_id?: string | null
+          device_ids?: string[]
+          device_limit?: number
           duration_days: number
           expires_at?: string | null
           id?: string
@@ -71,6 +75,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           device_id?: string | null
+          device_ids?: string[]
+          device_limit?: number
           duration_days?: number
           expires_at?: string | null
           id?: string

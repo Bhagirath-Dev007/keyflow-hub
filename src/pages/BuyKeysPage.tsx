@@ -27,20 +27,24 @@ export default function BuyKeysPage() {
   const [buyOpen, setBuyOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [deviceLimit, setDeviceLimit] = useState('1');
   const { toast } = useToast();
 
   useEffect(() => {
     supabase.from('pricing').select('*').order('user_price').then(({ data }) => { if (data) setPlans(data); });
   }, []);
 
+  const calcCost = (qty: number, devices: number) => qty * (10 + devices * 20);
+
   const handleBuy = async () => {
     const plan = plans.find(p => p.id === selectedPlan);
     if (!plan || !user || !profile) return;
     const qty = parseInt(quantity) || 1;
-    const totalCost = Number(plan.reseller_price) * qty;
+    const devices = parseInt(deviceLimit) || 1;
+    const totalCost = calcCost(qty, devices);
 
     if (Number(profile.wallet_balance) < totalCost) {
-      toast({ title: 'Insufficient balance', variant: 'destructive' }); return;
+      toast({ title: 'Insufficient balance', description: `Need ₹${totalCost}, you have ₹${Number(profile.wallet_balance)}`, variant: 'destructive' }); return;
     }
 
     // Deduct wallet
@@ -53,6 +57,7 @@ export default function BuyKeysPage() {
       plan_name: plan.plan_name,
       duration_days: plan.duration_days,
       created_by: user.id,
+      device_limit: devices,
     }));
     await supabase.from('license_keys').insert(keys);
 
@@ -62,7 +67,7 @@ export default function BuyKeysPage() {
       amount: totalCost,
       type: 'debit' as const,
       source: 'purchase' as const,
-      note: `Purchased ${qty}x ${plan.plan_name} keys`,
+      note: `Purchased ${qty}x ${plan.plan_name} keys (${devices} device${devices > 1 ? 's' : ''})`,
     });
 
     toast({ title: `${qty} key(s) purchased for ₹${totalCost}` });

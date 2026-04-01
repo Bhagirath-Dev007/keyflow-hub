@@ -145,7 +145,7 @@ export default function ResellerUsersPage() {
                   </TableCell>
                   <TableCell>
                     <Button size="sm" variant="ghost" onClick={() => { setCreditUser(u); setCreditOpen(true); }} title="Add Balance">
-                      <Plus className="h-4 w-4 text-green-500" /> Add Balance
+                      <Plus className="h-4 w-4 text-primary" /> Add Balance
                     </Button>
                   </TableCell>
                 </TableRow>

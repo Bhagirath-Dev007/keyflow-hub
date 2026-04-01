@@ -29,7 +29,7 @@ export default function UsersPage() {
   const [walletAmount, setWalletAmount] = useState('');
   const [walletNote, setWalletNote] = useState('');
   const [roleDialog, setRoleDialog] = useState<{ open: boolean; user: UserWithRole | null }>({ open: false, user: null });
-  const [newRole, setNewRole] = useState<AppRole>('user');
+  const [newRole, setNewRole] = useState<AppRole>('reseller');
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -38,7 +38,7 @@ export default function UsersPage() {
     if (profiles && roles) {
       const combined = profiles.map(p => ({
         ...p,
-        role: (roles.find(r => r.user_id === p.user_id)?.role || 'user') as AppRole,
+        role: (roles.find(r => r.user_id === p.user_id)?.role || 'reseller') as AppRole,
       }));
       setUsers(combined);
     }
@@ -95,12 +95,12 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (u: UserWithRole) => {
-    if (!confirm(`Are you sure you want to permanently delete user "${u.name || u.email}"? This will remove their profile, role, transactions, and activity logs.`)) return;
-    // Delete related data first, then profile and role
+    if (!confirm(`Are you sure you want to permanently delete "${u.name || u.email}"?`)) return;
     await Promise.all([
       supabase.from('transactions').delete().eq('user_id', u.user_id),
       supabase.from('activity_logs').delete().eq('user_id', u.user_id),
       supabase.from('license_keys').delete().eq('assigned_to', u.user_id),
+      supabase.from('wallet_requests').delete().eq('user_id', u.user_id),
     ]);
     await supabase.from('user_roles').delete().eq('user_id', u.user_id);
     const { error } = await supabase.from('profiles').delete().eq('user_id', u.user_id);
@@ -121,28 +121,27 @@ export default function UsersPage() {
   return (
     <DashboardLayout>
       <div className="animate-fade-in">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h1 className="page-header">User Management</h1>
           <Button variant="outline" size="sm" onClick={exportCSV}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
         </div>
 
-        <div className="mb-4 flex gap-3">
+        <div className="mb-4 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search users..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="reseller">Reseller</SelectItem>
-              <SelectItem value="user">User</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -165,7 +164,7 @@ export default function UsersPage() {
                     <Badge variant={u.is_banned ? 'destructive' : 'default'}>{u.is_banned ? 'Banned' : 'Active'}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex flex-wrap gap-1">
                       <Button size="sm" variant="ghost" onClick={() => setWalletDialog({ open: true, user: u, type: 'credit' })} title="Add Balance">
                         <Plus className="h-4 w-4 text-success" />
                       </Button>
@@ -220,7 +219,6 @@ export default function UsersPage() {
             <Select value={newRole} onValueChange={v => setNewRole(v as AppRole)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="user">User</SelectItem>
                 <SelectItem value="reseller">Reseller</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
               </SelectContent>

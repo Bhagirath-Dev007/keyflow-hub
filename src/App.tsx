@@ -13,9 +13,10 @@ import WalletPage from "./pages/WalletPage";
 import TransactionsPage from "./pages/TransactionsPage";
 import PricingPage from "./pages/PricingPage";
 import LogsPage from "./pages/LogsPage";
-import BuyKeysPage from "./pages/BuyKeysPage";
-import ProfitsPage from "./pages/ProfitsPage";
-import ResellerUsersPage from "./pages/ResellerUsersPage";
+import AddBalancePage from "./pages/AddBalancePage";
+import AdminWalletRequestsPage from "./pages/AdminWalletRequestsPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
+import BrandingPage from "./pages/BrandingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,13 +34,14 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/users" element={<ProtectedRoute allowedRoles={['admin']}><UsersPage /></ProtectedRoute>} />
             <Route path="/dashboard/keys" element={<ProtectedRoute><KeysPage /></ProtectedRoute>} />
-            <Route path="/dashboard/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
+            <Route path="/dashboard/wallet" element={<ProtectedRoute allowedRoles={['reseller']}><WalletPage /></ProtectedRoute>} />
             <Route path="/dashboard/transactions" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
             <Route path="/dashboard/pricing" element={<ProtectedRoute allowedRoles={['admin']}><PricingPage /></ProtectedRoute>} />
             <Route path="/dashboard/logs" element={<ProtectedRoute allowedRoles={['admin']}><LogsPage /></ProtectedRoute>} />
-            <Route path="/dashboard/buy-keys" element={<ProtectedRoute allowedRoles={['reseller']}><BuyKeysPage /></ProtectedRoute>} />
-            <Route path="/dashboard/profits" element={<ProtectedRoute allowedRoles={['reseller']}><ProfitsPage /></ProtectedRoute>} />
-            <Route path="/dashboard/reseller-users" element={<ProtectedRoute allowedRoles={['reseller']}><ResellerUsersPage /></ProtectedRoute>} />
+            <Route path="/dashboard/add-balance" element={<ProtectedRoute allowedRoles={['reseller']}><AddBalancePage /></ProtectedRoute>} />
+            <Route path="/dashboard/wallet-requests" element={<ProtectedRoute allowedRoles={['admin']}><AdminWalletRequestsPage /></ProtectedRoute>} />
+            <Route path="/dashboard/admin-settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettingsPage /></ProtectedRoute>} />
+            <Route path="/dashboard/branding" element={<ProtectedRoute allowedRoles={['reseller']}><BrandingPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

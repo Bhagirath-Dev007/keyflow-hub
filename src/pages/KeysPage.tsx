@@ -322,6 +322,15 @@ export default function KeysPage() {
                 </SelectContent>
               </Select>
             </div>
+            {role !== 'admin' && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <p className="text-sm font-medium">
+                  Cost: ₹{calcKeyCost(useCustomKey ? 1 : (parseInt(genCount) || 1), parseInt(genDeviceLimit) || 1).toLocaleString('en-IN')}
+                  <span className="text-muted-foreground ml-1">(₹10/key + ₹20/device)</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Wallet: ₹{Number(profile?.wallet_balance || 0).toLocaleString('en-IN')}</p>
+              </div>
+            )}
           </div>
           <DialogFooter><Button onClick={handleGenerate}>Generate</Button></DialogFooter>
         </DialogContent>

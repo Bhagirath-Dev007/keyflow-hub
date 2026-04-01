@@ -29,7 +29,7 @@ function generateKey(): string {
 }
 
 export default function KeysPage() {
-  const { user, role } = useAuth();
+  const { user, role, profile, refreshProfile } = useAuth();
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');

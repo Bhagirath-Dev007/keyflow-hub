@@ -60,6 +60,10 @@ export default function KeysPage() {
     return matchSearch && matchStatus;
   });
 
+  const calcKeyCost = (count: number, deviceLimit: number) => {
+    return count * (10 + deviceLimit * 20);
+  };
+
   const handleGenerate = async () => {
     if (!genPlan) return;
     const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
@@ -69,6 +73,31 @@ export default function KeysPage() {
     if (useCustomKey && !genCustomKey.trim()) {
       toast({ title: 'Please enter a custom key', variant: 'destructive' });
       return;
+    }
+
+    // Admin doesn't need wallet balance check
+    if (role !== 'admin') {
+      const totalCost = calcKeyCost(count, deviceLimit);
+      const currentBalance = Number(profile?.wallet_balance || 0);
+      if (currentBalance < totalCost) {
+        toast({ title: 'Insufficient wallet balance', description: `Need ₹${totalCost}, you have ₹${currentBalance}`, variant: 'destructive' });
+        return;
+      }
+
+      // Deduct wallet
+      const newBalance = currentBalance - totalCost;
+      await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', user!.id);
+
+      // Log transaction
+      await supabase.from('transactions').insert({
+        user_id: user!.id,
+        amount: totalCost,
+        type: 'debit' as const,
+        source: 'purchase' as const,
+        note: `Generated ${count}x ${genPlan} key(s) (${deviceLimit} device${deviceLimit > 1 ? 's' : ''})`,
+      });
+
+      refreshProfile();
     }
 
     const newKeys = Array.from({ length: count }, () => ({

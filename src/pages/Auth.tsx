@@ -9,11 +9,9 @@ import { KeyRound, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const { user, loading, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -23,12 +21,10 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = isLogin ? await signIn(email, password) : await signUp(email, password, name);
+    const { error } = await signIn(email, password);
     setSubmitting(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    } else if (!isLogin) {
-      toast({ title: 'Success', description: 'Check your email to confirm your account.' });
     }
   };
 
@@ -44,17 +40,11 @@ export default function Auth() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>{isLogin ? 'Sign In' : 'Create Account'}</CardTitle>
-            <CardDescription>{isLogin ? 'Enter your credentials to access your dashboard' : 'Fill in your details to get started'}</CardDescription>
+            <CardTitle>Sign In</CardTitle>
+            <CardDescription>Enter your credentials to access your dashboard</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" required />
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
@@ -65,15 +55,9 @@ export default function Auth() {
               </div>
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isLogin ? 'Sign In' : 'Create Account'}
+                Sign In
               </Button>
             </form>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <button onClick={() => setIsLogin(!isLogin)} className="font-medium text-primary hover:underline">
-                {isLogin ? 'Sign Up' : 'Sign In'}
-              </button>
-            </p>
           </CardContent>
         </Card>
       </div>

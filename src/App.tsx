@@ -15,6 +15,7 @@ import PricingPage from "./pages/PricingPage";
 import LogsPage from "./pages/LogsPage";
 import BuyKeysPage from "./pages/BuyKeysPage";
 import ProfitsPage from "./pages/ProfitsPage";
+import ResellerUsersPage from "./pages/ResellerUsersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

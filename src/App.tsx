@@ -15,6 +15,7 @@ import PricingPage from "./pages/PricingPage";
 import LogsPage from "./pages/LogsPage";
 import BuyKeysPage from "./pages/BuyKeysPage";
 import ProfitsPage from "./pages/ProfitsPage";
+import ResellerUsersPage from "./pages/ResellerUsersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/dashboard/logs" element={<ProtectedRoute allowedRoles={['admin']}><LogsPage /></ProtectedRoute>} />
             <Route path="/dashboard/buy-keys" element={<ProtectedRoute allowedRoles={['reseller']}><BuyKeysPage /></ProtectedRoute>} />
             <Route path="/dashboard/profits" element={<ProtectedRoute allowedRoles={['reseller']}><ProfitsPage /></ProtectedRoute>} />
+            <Route path="/dashboard/reseller-users" element={<ProtectedRoute allowedRoles={['reseller']}><ResellerUsersPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

@@ -21,9 +21,11 @@ const adminNav: NavItem[] = [
 
 const resellerNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { label: 'My Users', href: '/dashboard/reseller-users', icon: <Users className="h-4 w-4" /> },
   { label: 'Buy Keys', href: '/dashboard/buy-keys', icon: <ShoppingCart className="h-4 w-4" /> },
   { label: 'My Keys', href: '/dashboard/keys', icon: <Key className="h-4 w-4" /> },
   { label: 'Wallet', href: '/dashboard/wallet', icon: <Wallet className="h-4 w-4" /> },
+  { label: 'Transactions', href: '/dashboard/transactions', icon: <FileText className="h-4 w-4" /> },
   { label: 'Profit Stats', href: '/dashboard/profits', icon: <BarChart3 className="h-4 w-4" /> },
 ];
 

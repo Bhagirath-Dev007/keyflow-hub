@@ -14,18 +14,14 @@ import { Plus, Download, Copy, Search, Ban, RotateCcw, Trash2, Monitor } from 'l
 import { Switch } from '@/components/ui/switch';
 import type { Database } from '@/integrations/supabase/types';
 
-type LicenseKey = Database['public']['Tables']['license_keys']['Row'] & {
-  device_limit?: number;
-  device_ids?: string[];
-};
+type LicenseKey = Database['public']['Tables']['license_keys']['Row'];
 type KeyStatus = Database['public']['Enums']['key_status'];
 
 function generateKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const segments = Array.from({ length: 4 }, () =>
+  return Array.from({ length: 4 }, () =>
     Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  );
-  return segments.join('-');
+  ).join('-');
 }
 
 export default function KeysPage() {
@@ -40,16 +36,13 @@ export default function KeysPage() {
   const [genDeviceLimit, setGenDeviceLimit] = useState('1');
   const [genCustomKey, setGenCustomKey] = useState('');
   const [useCustomKey, setUseCustomKey] = useState(false);
-  const [activateOpen, setActivateOpen] = useState(false);
-  const [activateKey, setActivateKey] = useState('');
   const { toast } = useToast();
 
   const fetchKeys = async () => {
     let query = supabase.from('license_keys').select('*').order('created_at', { ascending: false });
-    if (role === 'user') query = query.eq('assigned_to', user!.id);
     if (role === 'reseller') query = query.eq('created_by', user!.id);
     const { data } = await query;
-    if (data) setKeys(data as LicenseKey[]);
+    if (data) setKeys(data);
   };
 
   useEffect(() => { if (user) fetchKeys(); }, [user, role]);
@@ -60,9 +53,7 @@ export default function KeysPage() {
     return matchSearch && matchStatus;
   });
 
-  const calcKeyCost = (count: number, deviceLimit: number) => {
-    return count * (10 + deviceLimit * 20);
-  };
+  const calcKeyCost = (count: number, deviceLimit: number) => count * (10 + deviceLimit * 20);
 
   const handleGenerate = async () => {
     if (!genPlan) return;
@@ -75,7 +66,6 @@ export default function KeysPage() {
       return;
     }
 
-    // Admin doesn't need wallet balance check
     if (role !== 'admin') {
       const totalCost = calcKeyCost(count, deviceLimit);
       const currentBalance = Number(profile?.wallet_balance || 0);
@@ -84,11 +74,8 @@ export default function KeysPage() {
         return;
       }
 
-      // Deduct wallet
       const newBalance = currentBalance - totalCost;
       await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', user!.id);
-
-      // Log transaction
       await supabase.from('transactions').insert({
         user_id: user!.id,
         amount: totalCost,
@@ -96,7 +83,6 @@ export default function KeysPage() {
         source: 'purchase' as const,
         note: `Generated ${count}x ${genPlan} key(s) (${deviceLimit} device${deviceLimit > 1 ? 's' : ''})`,
       });
-
       refreshProfile();
     }
 
@@ -119,65 +105,32 @@ export default function KeysPage() {
     fetchKeys();
   };
 
-  const handleActivateKey = async () => {
-    if (!activateKey.trim()) return;
-    const { data: keyData, error: findErr } = await supabase
-      .from('license_keys').select('*').eq('key', activateKey.trim()).eq('status', 'unused').single();
-    if (findErr || !keyData) {
-      toast({ title: 'Key not found or already used', variant: 'destructive' }); return;
-    }
-    const now = new Date();
-    const expiry = new Date(now.getTime() + keyData.duration_days * 86400000);
-    const { error } = await supabase.from('license_keys').update({
-      status: 'active' as KeyStatus,
-      assigned_to: user!.id,
-      activated_at: now.toISOString(),
-      expires_at: expiry.toISOString(),
-    }).eq('id', keyData.id);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Key activated!' });
-    setActivateOpen(false); setActivateKey('');
-    fetchKeys();
-  };
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      setActivateKey(text.trim());
-    } catch {
-      toast({ title: 'Could not read clipboard', variant: 'destructive' });
-    }
-  };
-
   const copyKey = (key: string) => {
     navigator.clipboard.writeText(key);
     toast({ title: 'Key copied!' });
   };
 
   const handleDeactivate = async (id: string) => {
-    const { error } = await supabase.from('license_keys').update({ status: 'revoked' as KeyStatus }).eq('id', id);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    toast({ title: 'Key revoked successfully' });
+    await supabase.from('license_keys').update({ status: 'revoked' as KeyStatus }).eq('id', id);
+    toast({ title: 'Key revoked' });
     fetchKeys();
   };
 
   const handleReactivate = async (k: LicenseKey) => {
     const now = new Date();
     const expiry = new Date(now.getTime() + k.duration_days * 86400000);
-    const { error } = await supabase.from('license_keys').update({
+    await supabase.from('license_keys').update({
       status: 'active' as KeyStatus,
       activated_at: now.toISOString(),
       expires_at: expiry.toISOString(),
     }).eq('id', k.id);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Key reactivated!' });
     fetchKeys();
   };
 
   const handleDeleteKey = async (id: string) => {
-    if (!confirm('Are you sure you want to permanently delete this key?')) return;
-    const { error } = await supabase.from('license_keys').delete().eq('id', id);
-    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
+    if (!confirm('Delete this key permanently?')) return;
+    await supabase.from('license_keys').delete().eq('id', id);
     toast({ title: 'Key deleted' });
     fetchKeys();
   };
@@ -204,12 +157,9 @@ export default function KeysPage() {
   return (
     <DashboardLayout>
       <div className="animate-fade-in">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h1 className="page-header">License Keys</h1>
-          <div className="flex gap-2">
-            {role === 'user' && (
-              <Button onClick={() => setActivateOpen(true)}><Plus className="mr-2 h-4 w-4" />Activate Key</Button>
-            )}
+          <div className="flex flex-wrap gap-2">
             {(role === 'admin' || role === 'reseller') && (
               <Button onClick={() => setGenerateOpen(true)}><Plus className="mr-2 h-4 w-4" />Generate Keys</Button>
             )}
@@ -217,13 +167,13 @@ export default function KeysPage() {
           </div>
         </div>
 
-        <div className="mb-4 flex gap-3">
+        <div className="mb-4 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search keys..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="unused">Unused</SelectItem>
@@ -234,7 +184,7 @@ export default function KeysPage() {
           </Select>
         </div>
 
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -260,18 +210,20 @@ export default function KeysPage() {
                     </div>
                   </TableCell>
                   <TableCell><Badge variant={statusColor(k.status)} className="capitalize">{k.status}</Badge></TableCell>
-                  <TableCell className="text-sm">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : '—'}</TableCell>
-                  <TableCell className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)} title="Copy key"><Copy className="h-4 w-4" /></Button>
-                    {(role === 'admin' || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeactivate(k.id)} title="Revoke key"><Ban className="h-4 w-4" /></Button>
-                    )}
-                    {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
-                      <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate key"><RotateCcw className="h-4 w-4" /></Button>
-                    )}
-                    {role === 'admin' && (
-                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteKey(k.id)} title="Delete key"><Trash2 className="h-4 w-4" /></Button>
-                    )}
+                  <TableCell className="text-sm whitespace-nowrap">{k.expires_at ? new Date(k.expires_at).toLocaleDateString() : '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)} title="Copy key"><Copy className="h-4 w-4" /></Button>
+                      {(role === 'admin' || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeactivate(k.id)} title="Revoke"><Ban className="h-4 w-4" /></Button>
+                      )}
+                      {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
+                        <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate"><RotateCcw className="h-4 w-4" /></Button>
+                      )}
+                      {role === 'admin' && (
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteKey(k.id)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -333,23 +285,6 @@ export default function KeysPage() {
             )}
           </div>
           <DialogFooter><Button onClick={handleGenerate}>Generate</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Activate Key Dialog */}
-      <Dialog open={activateOpen} onOpenChange={setActivateOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Activate License Key</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>License Key</Label>
-              <div className="flex gap-2">
-                <Input value={activateKey} onChange={e => setActivateKey(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX" className="font-mono" />
-                <Button variant="outline" onClick={handlePasteFromClipboard}>Paste</Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter><Button onClick={handleActivateKey}>Activate</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

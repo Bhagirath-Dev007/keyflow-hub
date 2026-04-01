@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       license_keys: {
         Row: {
           activated_at: string | null
@@ -122,7 +146,9 @@ export type Database = {
           email: string
           id: string
           is_banned: boolean
+          logo_url: string | null
           name: string
+          panel_name: string | null
           updated_at: string
           user_id: string
           wallet_balance: number
@@ -132,7 +158,9 @@ export type Database = {
           email?: string
           id?: string
           is_banned?: boolean
+          logo_url?: string | null
           name?: string
+          panel_name?: string | null
           updated_at?: string
           user_id: string
           wallet_balance?: number
@@ -142,7 +170,9 @@ export type Database = {
           email?: string
           id?: string
           is_banned?: boolean
+          logo_url?: string | null
           name?: string
+          panel_name?: string | null
           updated_at?: string
           user_id?: string
           wallet_balance?: number
@@ -197,6 +227,39 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          created_at: string
+          id: string
+          screenshot_url: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          created_at?: string
+          id?: string
+          screenshot_url?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          screenshot_url?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -217,6 +280,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user" | "reseller"
       key_status: "active" | "expired" | "revoked" | "unused"
+      payment_status: "pending" | "approved" | "rejected"
       transaction_source:
         | "admin"
         | "manual"
@@ -353,6 +417,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user", "reseller"],
       key_status: ["active", "expired", "revoked", "unused"],
+      payment_status: ["pending", "approved", "rejected"],
       transaction_source: ["admin", "manual", "system", "purchase", "reseller"],
       transaction_type: ["credit", "debit"],
     },

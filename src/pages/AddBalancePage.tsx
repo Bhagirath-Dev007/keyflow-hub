@@ -12,9 +12,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, Upload, Clock, CheckCircle, XCircle, Image } from 'lucide-react';
 
+// Credits → Real payment rate: ₹10,000 credits = ₹50 payment (ratio 200:1)
 const AMOUNT_OPTIONS = [
   1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000, 25000, 30000, 40000, 50000, 75000, 100000,
 ];
+const CREDIT_TO_PAYMENT_RATIO = 200;
+const calcPayment = (credits: number) => credits / CREDIT_TO_PAYMENT_RATIO;
 
 interface WalletRequest {
   id: string;
@@ -72,7 +75,6 @@ export default function AddBalancePage() {
     }
 
     setUploading(true);
-    // Upload screenshot
     const fileName = `${user.id}/${Date.now()}_${screenshot.name}`;
     const { error: uploadError } = await supabase.storage
       .from('payment-screenshots')
@@ -84,12 +86,11 @@ export default function AddBalancePage() {
       return;
     }
 
-    const { data: urlData } = supabase.storage.from('payment-screenshots').getPublicUrl(fileName);
-
+    // Store the file path (not public URL since bucket is private)
     const { error } = await supabase.from('wallet_requests').insert({
       user_id: user.id,
       amount,
-      screenshot_url: urlData.publicUrl,
+      screenshot_url: fileName,
     });
 
     if (error) {
@@ -103,6 +104,11 @@ export default function AddBalancePage() {
       fetchRequests();
     }
     setUploading(false);
+  };
+
+  const getSignedUrl = async (path: string) => {
+    const { data } = await supabase.storage.from('payment-screenshots').createSignedUrl(path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
   const statusIcon = (s: string) => {
@@ -138,7 +144,8 @@ export default function AddBalancePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Credits</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Screenshot</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Admin Note</TableHead>
@@ -149,11 +156,12 @@ export default function AddBalancePage() {
                 <TableRow key={r.id}>
                   <TableCell className="text-sm whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</TableCell>
                   <TableCell className="font-mono font-semibold">₹{Number(r.amount).toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="font-mono text-muted-foreground">₹{calcPayment(Number(r.amount)).toLocaleString('en-IN')}</TableCell>
                   <TableCell>
                     {r.screenshot_url ? (
-                      <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      <button onClick={() => getSignedUrl(r.screenshot_url!)} className="text-primary hover:underline flex items-center gap-1">
                         <Image className="h-3.5 w-3.5" /> View
-                      </a>
+                      </button>
                     ) : '—'}
                   </TableCell>
                   <TableCell>
@@ -166,7 +174,7 @@ export default function AddBalancePage() {
               ))}
               {requests.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No payment requests yet</TableCell>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No payment requests yet</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -179,12 +187,14 @@ export default function AddBalancePage() {
           <DialogHeader><DialogTitle>Add Wallet Balance</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Select Amount</Label>
+              <Label>Select Credits Amount</Label>
               <Select value={selectedAmount} onValueChange={(v) => { setSelectedAmount(v); setShowQr(true); }}>
                 <SelectTrigger><SelectValue placeholder="Choose amount" /></SelectTrigger>
                 <SelectContent>
                   {AMOUNT_OPTIONS.map(a => (
-                    <SelectItem key={a} value={String(a)}>₹{a.toLocaleString('en-IN')}</SelectItem>
+                    <SelectItem key={a} value={String(a)}>
+                      ₹{a.toLocaleString('en-IN')} credits → Pay ₹{calcPayment(a).toLocaleString('en-IN')}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -193,7 +203,12 @@ export default function AddBalancePage() {
             {showQr && selectedAmount && (
               <>
                 <div className="rounded-xl border bg-muted/50 p-4 text-center space-y-3">
-                  <p className="text-sm font-medium">Pay ₹{parseInt(selectedAmount).toLocaleString('en-IN')} using the QR code below</p>
+                  <p className="text-sm font-medium">
+                    Pay <span className="text-primary font-bold">₹{calcPayment(parseInt(selectedAmount)).toLocaleString('en-IN')}</span> using the QR code below
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    You'll receive ₹{parseInt(selectedAmount).toLocaleString('en-IN')} credits in your wallet
+                  </p>
                   {qrImageUrl ? (
                     <img src={qrImageUrl} alt="Payment QR" className="mx-auto max-w-[220px] rounded-lg border" />
                   ) : (

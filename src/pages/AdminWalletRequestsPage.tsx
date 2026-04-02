@@ -34,7 +34,7 @@ export default function AdminWalletRequestsPage() {
   const [requests, setRequests] = useState<(WalletRequest & { profile?: Profile })[]>([]);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [search, setSearch] = useState('');
-  const [actionDialog, setActionDialog] = useState<{ open: boolean; request: WalletRequest | null; action: 'approve' | 'reject' }>({ open: false, request: null, action: 'approve' });
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; request: WalletRequest | null; action: 'approve' | 'reject'; screenshotUrl?: string }>({ open: false, request: null, action: 'approve' });
   const [adminNote, setAdminNote] = useState('');
   const { toast } = useToast();
 
@@ -59,32 +59,38 @@ export default function AdminWalletRequestsPage() {
     return matchStatus && matchSearch;
   });
 
+  const openActionDialog = async (request: WalletRequest, action: 'approve' | 'reject') => {
+    let screenshotUrl = '';
+    if (request.screenshot_url) {
+      const { data } = await supabase.storage.from('payment-screenshots').createSignedUrl(request.screenshot_url, 3600);
+      if (data?.signedUrl) screenshotUrl = data.signedUrl;
+    }
+    setActionDialog({ open: true, request, action, screenshotUrl });
+  };
+
   const handleAction = async () => {
     const req = actionDialog.request;
     if (!req) return;
 
     const newStatus = actionDialog.action === 'approve' ? 'approved' : 'rejected';
 
-    // Update request status
     await supabase.from('wallet_requests').update({
       status: newStatus,
       admin_note: adminNote,
     }).eq('id', req.id);
 
-    // If approved, credit the user's wallet
     if (actionDialog.action === 'approve') {
       const profile = requests.find(r => r.id === req.id)?.profile;
       if (profile) {
         const newBalance = Number(profile.wallet_balance) + Number(req.amount);
         await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', req.user_id);
 
-        // Log transaction
         await supabase.from('transactions').insert({
           user_id: req.user_id,
           amount: req.amount,
           type: 'credit' as const,
           source: 'admin' as const,
-          note: `Balance request approved${adminNote ? ': ' + adminNote : ''}`,
+          note: `Balance request approved (₹${(Number(req.amount) / 200).toLocaleString('en-IN')} paid)${adminNote ? ': ' + adminNote : ''}`,
         });
       }
     }
@@ -93,6 +99,11 @@ export default function AdminWalletRequestsPage() {
     setActionDialog({ open: false, request: null, action: 'approve' });
     setAdminNote('');
     fetchRequests();
+  };
+
+  const viewScreenshot = async (path: string) => {
+    const { data } = await supabase.storage.from('payment-screenshots').createSignedUrl(path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
   if (role !== 'admin') return <DashboardLayout><p>Access denied</p></DashboardLayout>;
@@ -123,7 +134,8 @@ export default function AdminWalletRequestsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Credits</TableHead>
+                <TableHead>Paid</TableHead>
                 <TableHead>Screenshot</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
@@ -140,11 +152,12 @@ export default function AdminWalletRequestsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono font-semibold whitespace-nowrap">₹{Number(r.amount).toLocaleString('en-IN')}</TableCell>
+                  <TableCell className="font-mono text-muted-foreground whitespace-nowrap">₹{(Number(r.amount) / 200).toLocaleString('en-IN')}</TableCell>
                   <TableCell>
                     {r.screenshot_url ? (
-                      <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      <button onClick={() => viewScreenshot(r.screenshot_url!)} className="text-primary hover:underline flex items-center gap-1">
                         <Image className="h-3.5 w-3.5" /> View
-                      </a>
+                      </button>
                     ) : '—'}
                   </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</TableCell>
@@ -159,10 +172,10 @@ export default function AdminWalletRequestsPage() {
                   <TableCell>
                     {r.status === 'pending' && (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="default" onClick={() => setActionDialog({ open: true, request: r, action: 'approve' })}>
+                        <Button size="sm" variant="default" onClick={() => openActionDialog(r, 'approve')}>
                           <CheckCircle className="mr-1 h-3.5 w-3.5" /> Approve
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => setActionDialog({ open: true, request: r, action: 'reject' })}>
+                        <Button size="sm" variant="destructive" onClick={() => openActionDialog(r, 'reject')}>
                           <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
                         </Button>
                       </div>
@@ -174,7 +187,7 @@ export default function AdminWalletRequestsPage() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No requests found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No requests found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -187,13 +200,14 @@ export default function AdminWalletRequestsPage() {
             <DialogTitle>{actionDialog.action === 'approve' ? 'Approve' : 'Reject'} Payment Request</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-sm">
-              Amount: <span className="font-mono font-bold">₹{Number(actionDialog.request?.amount || 0).toLocaleString('en-IN')}</span>
-            </p>
-            {actionDialog.request?.screenshot_url && (
+            <div className="text-sm space-y-1">
+              <p>Credits: <span className="font-mono font-bold">₹{Number(actionDialog.request?.amount || 0).toLocaleString('en-IN')}</span></p>
+              <p>Payment: <span className="font-mono font-bold">₹{(Number(actionDialog.request?.amount || 0) / 200).toLocaleString('en-IN')}</span></p>
+            </div>
+            {actionDialog.screenshotUrl && (
               <div>
                 <Label className="mb-2 block">Payment Screenshot</Label>
-                <img src={actionDialog.request.screenshot_url} alt="Payment screenshot" className="max-h-64 rounded-lg border" />
+                <img src={actionDialog.screenshotUrl} alt="Payment screenshot" className="max-h-64 rounded-lg border" />
               </div>
             )}
             <div className="space-y-2">

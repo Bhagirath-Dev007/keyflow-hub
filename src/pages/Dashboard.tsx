@@ -9,7 +9,7 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       {role === 'admin' && <AdminDashboard />}
-      {(role === 'reseller' || role === 'user') && <ResellerDashboard />}
+      {role === 'reseller' && <ResellerDashboard />}
     </DashboardLayout>
   );
 }

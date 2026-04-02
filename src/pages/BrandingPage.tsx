@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -11,18 +11,38 @@ import { Paintbrush, Upload, Trash2 } from 'lucide-react';
 
 export default function BrandingPage() {
   const { user, profile, refreshProfile } = useAuth();
-  const [panelName, setPanelName] = useState(profile?.panel_name || '');
-  const [logoUrl, setLogoUrl] = useState(profile?.logo_url || '');
+  const [panelName, setPanelName] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Sync state when profile loads
+  useEffect(() => {
+    if (profile) {
+      setPanelName(profile.panel_name || '');
+      setLogoUrl(profile.logo_url || '');
+    }
+  }, [profile]);
+
   const handleUploadLogo = async (file: File) => {
     if (!user) return;
+    
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: 'Invalid file type', description: 'Please upload PNG, JPEG or WebP image', variant: 'destructive' });
+      return;
+    }
+
     setUploading(true);
-    const fileName = `logos/${user.id}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from('admin-assets').upload(fileName, file);
+    const ext = file.name.split('.').pop();
+    const fileName = `logos/${user.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('admin-assets').upload(fileName, file, {
+      contentType: file.type,
+      upsert: true,
+    });
     if (error) {
       toast({ title: 'Upload failed', description: error.message, variant: 'destructive' });
       setUploading(false);
@@ -68,7 +88,7 @@ export default function BrandingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Panel Logo</Label>
+              <Label>Panel Logo (PNG, JPEG)</Label>
               {logoUrl ? (
                 <div className="flex items-center gap-4">
                   <img src={logoUrl} alt="Logo" className="h-16 w-16 rounded-xl object-cover border" />
@@ -93,7 +113,7 @@ export default function BrandingPage() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
                 className="hidden"
                 onChange={e => {
                   const file = e.target.files?.[0];

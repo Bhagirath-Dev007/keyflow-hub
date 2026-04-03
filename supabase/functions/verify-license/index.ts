@@ -17,10 +17,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { license_key, device_id } = await req.json();
+    const { license_key, device_id, app_name } = await req.json();
 
-    if (!license_key || !device_id) {
-      return new Response(JSON.stringify({ valid: false, error: 'Missing license_key or device_id' }), {
+    if (!license_key || !device_id || !app_name) {
+      return new Response(JSON.stringify({ valid: false, error: 'Missing license_key, device_id, or app_name' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -37,8 +37,21 @@ serve(async (req) => {
       });
     }
 
+    // Check app_name match
+    if (keyData.app_name !== app_name) {
+      return new Response(JSON.stringify({ valid: false, error: `This key is for "${keyData.app_name}", not "${app_name}"` }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     if (keyData.status === 'revoked') {
       return new Response(JSON.stringify({ valid: false, error: 'Key has been revoked' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (keyData.status === 'expired') {
+      return new Response(JSON.stringify({ valid: false, error: 'Key has expired' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -63,6 +76,7 @@ serve(async (req) => {
         valid: true,
         status: 'active',
         plan: keyData.plan_name,
+        app_name: keyData.app_name,
         expires_at: expiry.toISOString(),
         device_limit: deviceLimit,
         devices_used: 1,
@@ -75,7 +89,7 @@ serve(async (req) => {
       // Check expiry first
       if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
         await supabase.from('license_keys').update({ status: 'expired' }).eq('id', keyData.id);
-        return new Response(JSON.stringify({ valid: false, error: 'Key has expired' }), {
+        return new Response(JSON.stringify({ valid: false, error: 'Key has expired', status: 'expired' }), {
           status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -86,6 +100,7 @@ serve(async (req) => {
           valid: true,
           status: 'active',
           plan: keyData.plan_name,
+          app_name: keyData.app_name,
           expires_at: keyData.expires_at,
           device_limit: deviceLimit,
           devices_used: deviceIds.length,
@@ -106,13 +121,14 @@ serve(async (req) => {
       const updatedDevices = [...deviceIds, device_id];
       await supabase.from('license_keys').update({
         device_ids: updatedDevices,
-        device_id, // keep latest device in legacy field
+        device_id,
       }).eq('id', keyData.id);
 
       return new Response(JSON.stringify({
         valid: true,
         status: 'active',
         plan: keyData.plan_name,
+        app_name: keyData.app_name,
         expires_at: keyData.expires_at,
         device_limit: deviceLimit,
         devices_used: updatedDevices.length,
@@ -121,7 +137,7 @@ serve(async (req) => {
     }
 
     // Expired
-    return new Response(JSON.stringify({ valid: false, error: 'Key has expired' }), {
+    return new Response(JSON.stringify({ valid: false, error: 'Key has expired', status: 'expired' }), {
       status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

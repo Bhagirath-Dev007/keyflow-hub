@@ -49,10 +49,13 @@ export default function KeysPage() {
 
   useEffect(() => { if (user) fetchKeys(); }, [user, role]);
 
+  const appNames = [...new Set(keys.map(k => (k as any).app_name).filter(Boolean))];
+
   const filtered = keys.filter(k => {
-    const matchSearch = k.key.toLowerCase().includes(search.toLowerCase()) || k.plan_name.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = k.key.toLowerCase().includes(search.toLowerCase()) || k.plan_name.toLowerCase().includes(search.toLowerCase()) || ((k as any).app_name || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || k.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchApp = appFilter === 'all' || (k as any).app_name === appFilter;
+    return matchSearch && matchStatus && matchApp;
   });
 
   const calcKeyCost = (count: number, deviceLimit: number) => count * (10 + deviceLimit * 20);

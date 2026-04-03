@@ -278,6 +278,11 @@ export default function KeysPage() {
               </div>
             )}
             <div className="space-y-2">
+              <Label>App Name <span className="text-destructive">*</span></Label>
+              <Input value={genAppName} onChange={e => setGenAppName(e.target.value)} placeholder="e.g. MARS LOADER, BRX LOADER" className="uppercase" />
+              <p className="text-xs text-muted-foreground">Key will only work in this specific app</p>
+            </div>
+            <div className="space-y-2">
               <Label>Plan Name</Label>
               <Input value={genPlan} onChange={e => setGenPlan(e.target.value)} placeholder="e.g. Premium" />
             </div>

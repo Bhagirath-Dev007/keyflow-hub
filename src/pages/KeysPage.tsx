@@ -191,6 +191,17 @@ export default function KeysPage() {
               <SelectItem value="revoked">Revoked</SelectItem>
             </SelectContent>
           </Select>
+          {appNames.length > 0 && (
+            <Select value={appFilter} onValueChange={setAppFilter}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All Apps" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Apps</SelectItem>
+                {appNames.map(a => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="rounded-xl border bg-card overflow-x-auto">

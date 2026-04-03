@@ -209,6 +209,7 @@ export default function KeysPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Key</TableHead>
+                <TableHead>App</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Devices</TableHead>
@@ -221,6 +222,7 @@ export default function KeysPage() {
               {filtered.map(k => (
                 <TableRow key={k.id}>
                   <TableCell className="font-mono text-sm">{k.key}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs">{(k as any).app_name || '—'}</Badge></TableCell>
                   <TableCell>{k.plan_name}</TableCell>
                   <TableCell>{k.duration_days}d</TableCell>
                   <TableCell>

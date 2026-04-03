@@ -154,10 +154,10 @@ export default function KeysPage() {
   };
 
   const exportCSV = () => {
-    const header = 'Key,Plan,Duration,Status,Device Limit,Devices,Created At,Expires At\n';
+    const header = 'Key,App,Plan,Duration,Status,Device Limit,Devices,Created At,Expires At\n';
     const rows = filtered.map(k => {
       const devices = (k.device_ids || []).join('; ');
-      return `${k.key},${k.plan_name},${k.duration_days},${k.status},${k.device_limit || 1},${devices},${k.created_at},${k.expires_at || ''}`;
+      return `${k.key},${(k as any).app_name || ''},${k.plan_name},${k.duration_days},${k.status},${k.device_limit || 1},${devices},${k.created_at},${k.expires_at || ''}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'license_keys.csv'; a.click();

@@ -250,7 +250,7 @@ export default function KeysPage() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

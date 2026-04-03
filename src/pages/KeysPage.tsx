@@ -36,6 +36,8 @@ export default function KeysPage() {
   const [genDeviceLimit, setGenDeviceLimit] = useState('1');
   const [genCustomKey, setGenCustomKey] = useState('');
   const [useCustomKey, setUseCustomKey] = useState(false);
+  const [genAppName, setGenAppName] = useState('');
+  const [appFilter, setAppFilter] = useState<string>('all');
   const { toast } = useToast();
 
   const fetchKeys = async () => {

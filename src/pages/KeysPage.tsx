@@ -110,7 +110,7 @@ export default function KeysPage() {
     }
     toast({ title: `${count} key(s) generated` });
     setGenerateOpen(false);
-    setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1');
+    setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1'); setGenAppName('');
     fetchKeys();
   };
 

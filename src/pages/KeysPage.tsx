@@ -36,6 +36,8 @@ export default function KeysPage() {
   const [genDeviceLimit, setGenDeviceLimit] = useState('1');
   const [genCustomKey, setGenCustomKey] = useState('');
   const [useCustomKey, setUseCustomKey] = useState(false);
+  const [genAppName, setGenAppName] = useState('');
+  const [appFilter, setAppFilter] = useState<string>('all');
   const { toast } = useToast();
 
   const fetchKeys = async () => {
@@ -47,16 +49,22 @@ export default function KeysPage() {
 
   useEffect(() => { if (user) fetchKeys(); }, [user, role]);
 
+  const appNames = [...new Set(keys.map(k => (k as any).app_name).filter(Boolean))];
+
   const filtered = keys.filter(k => {
-    const matchSearch = k.key.toLowerCase().includes(search.toLowerCase()) || k.plan_name.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = k.key.toLowerCase().includes(search.toLowerCase()) || k.plan_name.toLowerCase().includes(search.toLowerCase()) || ((k as any).app_name || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || k.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchApp = appFilter === 'all' || (k as any).app_name === appFilter;
+    return matchSearch && matchStatus && matchApp;
   });
 
   const calcKeyCost = (count: number, deviceLimit: number) => count * (10 + deviceLimit * 20);
 
   const handleGenerate = async () => {
-    if (!genPlan) return;
+    if (!genPlan || !genAppName.trim()) {
+      toast({ title: 'Plan name and App name are required', variant: 'destructive' });
+      return;
+    }
     const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
     const duration = parseInt(genDuration) || 30;
     const deviceLimit = parseInt(genDeviceLimit) || 1;
@@ -92,16 +100,17 @@ export default function KeysPage() {
       duration_days: duration,
       created_by: user!.id,
       device_limit: deviceLimit,
+      app_name: genAppName.trim().toUpperCase(),
     }));
 
-    const { error } = await supabase.from('license_keys').insert(newKeys);
+    const { error } = await supabase.from('license_keys').insert(newKeys as any);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
     toast({ title: `${count} key(s) generated` });
     setGenerateOpen(false);
-    setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1');
+    setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1'); setGenAppName('');
     fetchKeys();
   };
 
@@ -145,10 +154,10 @@ export default function KeysPage() {
   };
 
   const exportCSV = () => {
-    const header = 'Key,Plan,Duration,Status,Device Limit,Devices,Created At,Expires At\n';
+    const header = 'Key,App,Plan,Duration,Status,Device Limit,Devices,Created At,Expires At\n';
     const rows = filtered.map(k => {
       const devices = (k.device_ids || []).join('; ');
-      return `${k.key},${k.plan_name},${k.duration_days},${k.status},${k.device_limit || 1},${devices},${k.created_at},${k.expires_at || ''}`;
+      return `${k.key},${(k as any).app_name || ''},${k.plan_name},${k.duration_days},${k.status},${k.device_limit || 1},${devices},${k.created_at},${k.expires_at || ''}`;
     }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'license_keys.csv'; a.click();
@@ -182,6 +191,17 @@ export default function KeysPage() {
               <SelectItem value="revoked">Revoked</SelectItem>
             </SelectContent>
           </Select>
+          {appNames.length > 0 && (
+            <Select value={appFilter} onValueChange={setAppFilter}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All Apps" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Apps</SelectItem>
+                {appNames.map(a => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="rounded-xl border bg-card overflow-x-auto">
@@ -189,6 +209,7 @@ export default function KeysPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Key</TableHead>
+                <TableHead>App</TableHead>
                 <TableHead>Plan</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Devices</TableHead>
@@ -201,6 +222,7 @@ export default function KeysPage() {
               {filtered.map(k => (
                 <TableRow key={k.id}>
                   <TableCell className="font-mono text-sm">{k.key}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs">{(k as any).app_name || '—'}</Badge></TableCell>
                   <TableCell>{k.plan_name}</TableCell>
                   <TableCell>{k.duration_days}d</TableCell>
                   <TableCell>
@@ -228,7 +250,7 @@ export default function KeysPage() {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No keys found</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -255,6 +277,11 @@ export default function KeysPage() {
                 <Input type="number" min="1" max="100" value={genCount} onChange={e => setGenCount(e.target.value)} />
               </div>
             )}
+            <div className="space-y-2">
+              <Label>App Name <span className="text-destructive">*</span></Label>
+              <Input value={genAppName} onChange={e => setGenAppName(e.target.value)} placeholder="e.g. MARS LOADER, BRX LOADER" className="uppercase" />
+              <p className="text-xs text-muted-foreground">Key will only work in this specific app</p>
+            </div>
             <div className="space-y-2">
               <Label>Plan Name</Label>
               <Input value={genPlan} onChange={e => setGenPlan(e.target.value)} placeholder="e.g. Premium" />

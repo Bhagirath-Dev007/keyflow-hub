@@ -100,9 +100,10 @@ export default function KeysPage() {
       duration_days: duration,
       created_by: user!.id,
       device_limit: deviceLimit,
+      app_name: genAppName.trim().toUpperCase(),
     }));
 
-    const { error } = await supabase.from('license_keys').insert(newKeys);
+    const { error } = await supabase.from('license_keys').insert(newKeys as any);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;

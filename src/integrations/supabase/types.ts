@@ -65,6 +65,7 @@ export type Database = {
       license_keys: {
         Row: {
           activated_at: string | null
+          app_name: string
           assigned_to: string | null
           created_at: string
           created_by: string | null
@@ -80,6 +81,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          app_name?: string
           assigned_to?: string | null
           created_at?: string
           created_by?: string | null
@@ -95,6 +97,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          app_name?: string
           assigned_to?: string | null
           created_at?: string
           created_by?: string | null

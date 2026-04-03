@@ -61,7 +61,10 @@ export default function KeysPage() {
   const calcKeyCost = (count: number, deviceLimit: number) => count * (10 + deviceLimit * 20);
 
   const handleGenerate = async () => {
-    if (!genPlan) return;
+    if (!genPlan || !genAppName.trim()) {
+      toast({ title: 'Plan name and App name are required', variant: 'destructive' });
+      return;
+    }
     const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
     const duration = parseInt(genDuration) || 30;
     const deviceLimit = parseInt(genDeviceLimit) || 1;

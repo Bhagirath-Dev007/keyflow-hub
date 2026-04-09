@@ -13,24 +13,14 @@ import { CheckCircle, XCircle, Clock, Image, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface WalletRequest {
-  id: string;
-  user_id: string;
-  amount: number;
+  id: string; user_id: string; amount: number;
   status: 'pending' | 'approved' | 'rejected';
-  screenshot_url: string | null;
-  admin_note: string | null;
-  created_at: string;
+  screenshot_url: string | null; admin_note: string | null; created_at: string;
 }
-
-interface Profile {
-  user_id: string;
-  name: string;
-  email: string;
-  wallet_balance: number;
-}
+interface Profile { user_id: string; name: string; email: string; wallet_balance: number; }
 
 export default function AdminWalletRequestsPage() {
-  const { role } = useAuth();
+  const { isAdminOrOwner } = useAuth();
   const [requests, setRequests] = useState<(WalletRequest & { profile?: Profile })[]>([]);
   const [statusFilter, setStatusFilter] = useState('pending');
   const [search, setSearch] = useState('');
@@ -39,19 +29,15 @@ export default function AdminWalletRequestsPage() {
   const { toast } = useToast();
 
   const fetchRequests = async () => {
-    const { data: reqs } = await supabase
-      .from('wallet_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data: reqs } = await supabase.from('wallet_requests').select('*').order('created_at', { ascending: false });
     const { data: profiles } = await supabase.from('profiles').select('user_id, name, email, wallet_balance');
-
     if (reqs && profiles) {
       const profileMap = new Map(profiles.map(p => [p.user_id, p]));
       setRequests(reqs.map(r => ({ ...r, profile: profileMap.get(r.user_id) })) as any);
     }
   };
 
-  useEffect(() => { if (role === 'admin') fetchRequests(); }, [role]);
+  useEffect(() => { if (isAdminOrOwner) fetchRequests(); }, [isAdminOrOwner]);
 
   const filtered = requests.filter(r => {
     const matchStatus = statusFilter === 'all' || r.status === statusFilter;
@@ -71,30 +57,19 @@ export default function AdminWalletRequestsPage() {
   const handleAction = async () => {
     const req = actionDialog.request;
     if (!req) return;
-
     const newStatus = actionDialog.action === 'approve' ? 'approved' : 'rejected';
-
-    await supabase.from('wallet_requests').update({
-      status: newStatus,
-      admin_note: adminNote,
-    }).eq('id', req.id);
-
+    await supabase.from('wallet_requests').update({ status: newStatus, admin_note: adminNote }).eq('id', req.id);
     if (actionDialog.action === 'approve') {
       const profile = requests.find(r => r.id === req.id)?.profile;
       if (profile) {
         const newBalance = Number(profile.wallet_balance) + Number(req.amount);
         await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', req.user_id);
-
         await supabase.from('transactions').insert({
-          user_id: req.user_id,
-          amount: req.amount,
-          type: 'credit' as const,
-          source: 'admin' as const,
+          user_id: req.user_id, amount: req.amount, type: 'credit' as const, source: 'admin' as const,
           note: `Balance request approved (₹${(Number(req.amount) / 200).toLocaleString('en-IN')} paid)${adminNote ? ': ' + adminNote : ''}`,
         });
       }
     }
-
     toast({ title: `Request ${newStatus}` });
     setActionDialog({ open: false, request: null, action: 'approve' });
     setAdminNote('');
@@ -106,13 +81,12 @@ export default function AdminWalletRequestsPage() {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
-  if (role !== 'admin') return <DashboardLayout><p>Access denied</p></DashboardLayout>;
+  if (!isAdminOrOwner) return <DashboardLayout><p>Access denied</p></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="animate-fade-in">
         <h1 className="page-header mb-6">Wallet Requests</h1>
-
         <div className="mb-4 flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -128,7 +102,6 @@ export default function AdminWalletRequestsPage() {
             </SelectContent>
           </Select>
         </div>
-
         <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
@@ -170,17 +143,12 @@ export default function AdminWalletRequestsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {r.status === 'pending' && (
+                    {r.status === 'pending' ? (
                       <div className="flex gap-1">
-                        <Button size="sm" variant="default" onClick={() => openActionDialog(r, 'approve')}>
-                          <CheckCircle className="mr-1 h-3.5 w-3.5" /> Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => openActionDialog(r, 'reject')}>
-                          <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
-                        </Button>
+                        <Button size="sm" variant="default" onClick={() => openActionDialog(r, 'approve')}><CheckCircle className="mr-1 h-3.5 w-3.5" />Approve</Button>
+                        <Button size="sm" variant="destructive" onClick={() => openActionDialog(r, 'reject')}><XCircle className="mr-1 h-3.5 w-3.5" />Reject</Button>
                       </div>
-                    )}
-                    {r.status !== 'pending' && (
+                    ) : (
                       <span className="text-xs text-muted-foreground">{r.admin_note || '—'}</span>
                     )}
                   </TableCell>
@@ -193,22 +161,16 @@ export default function AdminWalletRequestsPage() {
           </Table>
         </div>
       </div>
-
       <Dialog open={actionDialog.open} onOpenChange={open => !open && setActionDialog({ open: false, request: null, action: 'approve' })}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{actionDialog.action === 'approve' ? 'Approve' : 'Reject'} Payment Request</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{actionDialog.action === 'approve' ? 'Approve' : 'Reject'} Payment Request</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="text-sm space-y-1">
               <p>Credits: <span className="font-mono font-bold">₹{Number(actionDialog.request?.amount || 0).toLocaleString('en-IN')}</span></p>
               <p>Payment: <span className="font-mono font-bold">₹{(Number(actionDialog.request?.amount || 0) / 200).toLocaleString('en-IN')}</span></p>
             </div>
             {actionDialog.screenshotUrl && (
-              <div>
-                <Label className="mb-2 block">Payment Screenshot</Label>
-                <img src={actionDialog.screenshotUrl} alt="Payment screenshot" className="max-h-64 rounded-lg border" />
-              </div>
+              <div><Label className="mb-2 block">Payment Screenshot</Label><img src={actionDialog.screenshotUrl} alt="Payment screenshot" className="max-h-64 rounded-lg border" /></div>
             )}
             <div className="space-y-2">
               <Label>Admin Note (optional)</Label>

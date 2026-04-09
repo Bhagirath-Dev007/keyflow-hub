@@ -11,15 +11,15 @@ import type { Database } from '@/integrations/supabase/types';
 type Transaction = Database['public']['Tables']['transactions']['Row'];
 
 export default function TransactionsPage() {
-  const { user, role } = useAuth();
+  const { user, isAdminOrOwner } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
     if (!user) return;
     let query = supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(200);
-    if (role !== 'admin') query = query.eq('user_id', user.id);
+    if (!isAdminOrOwner) query = query.eq('user_id', user.id);
     query.then(({ data }) => { if (data) setTransactions(data); });
-  }, [user, role]);
+  }, [user, isAdminOrOwner]);
 
   const exportCSV = () => {
     const header = 'Date,Type,Amount,Source,Note\n';
@@ -35,7 +35,7 @@ export default function TransactionsPage() {
           <h1 className="page-header">Transactions</h1>
           <Button variant="outline" size="sm" onClick={exportCSV}><Download className="mr-2 h-4 w-4" />Export CSV</Button>
         </div>
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -49,7 +49,7 @@ export default function TransactionsPage() {
             <TableBody>
               {transactions.map(t => (
                 <TableRow key={t.id}>
-                  <TableCell className="text-sm">{new Date(t.created_at).toLocaleString()}</TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">{new Date(t.created_at).toLocaleString()}</TableCell>
                   <TableCell><Badge variant={t.type === 'credit' ? 'default' : 'destructive'} className="capitalize">{t.type}</Badge></TableCell>
                   <TableCell className="font-mono">{t.type === 'credit' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}</TableCell>
                   <TableCell className="capitalize">{t.source}</TableCell>

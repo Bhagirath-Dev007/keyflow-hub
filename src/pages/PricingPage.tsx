@@ -14,7 +14,7 @@ import type { Database } from '@/integrations/supabase/types';
 type Pricing = Database['public']['Tables']['pricing']['Row'];
 
 export default function PricingPage() {
-  const { role } = useAuth();
+  const { isAdminOrOwner } = useAuth();
   const [plans, setPlans] = useState<Pricing[]>([]);
   const [dialog, setDialog] = useState<{ open: boolean; plan: Pricing | null }>({ open: false, plan: null });
   const [form, setForm] = useState({ plan_name: '', duration_days: '30', user_price: '', reseller_price: '' });
@@ -60,7 +60,7 @@ export default function PricingPage() {
     fetchPlans();
   };
 
-  if (role !== 'admin') return <DashboardLayout><p>Access denied</p></DashboardLayout>;
+  if (!isAdminOrOwner) return <DashboardLayout><p>Access denied</p></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -69,8 +69,7 @@ export default function PricingPage() {
           <h1 className="page-header">Pricing Plans</h1>
           <Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Add Plan</Button>
         </div>
-
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -103,7 +102,6 @@ export default function PricingPage() {
           </Table>
         </div>
       </div>
-
       <Dialog open={dialog.open} onOpenChange={open => !open && setDialog({ open: false, plan: null })}>
         <DialogContent>
           <DialogHeader><DialogTitle>{dialog.plan ? 'Edit Plan' : 'Create Plan'}</DialogTitle></DialogHeader>

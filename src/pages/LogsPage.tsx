@@ -8,22 +8,22 @@ import type { Database } from '@/integrations/supabase/types';
 type Log = Database['public']['Tables']['activity_logs']['Row'];
 
 export default function LogsPage() {
-  const { role } = useAuth();
+  const { isAdminOrOwner } = useAuth();
   const [logs, setLogs] = useState<Log[]>([]);
 
   useEffect(() => {
-    if (role !== 'admin') return;
+    if (!isAdminOrOwner) return;
     supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(200)
       .then(({ data }) => { if (data) setLogs(data); });
-  }, [role]);
+  }, [isAdminOrOwner]);
 
-  if (role !== 'admin') return <DashboardLayout><p>Access denied</p></DashboardLayout>;
+  if (!isAdminOrOwner) return <DashboardLayout><p>Access denied</p></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="animate-fade-in">
         <h1 className="page-header mb-6">Activity Logs</h1>
-        <div className="rounded-xl border bg-card">
+        <div className="rounded-xl border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -35,9 +35,9 @@ export default function LogsPage() {
             <TableBody>
               {logs.map(l => (
                 <TableRow key={l.id}>
-                  <TableCell className="text-sm">{new Date(l.created_at).toLocaleString()}</TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
                   <TableCell>{l.action}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground font-mono">{JSON.stringify(l.details)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground font-mono max-w-xs truncate">{JSON.stringify(l.details)}</TableCell>
                 </TableRow>
               ))}
               {logs.length === 0 && (

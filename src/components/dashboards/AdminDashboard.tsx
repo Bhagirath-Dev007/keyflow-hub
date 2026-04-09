@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Key, Wallet, CreditCard } from 'lucide-react';
+import { Users, Key, Wallet, CreditCard, Gift, Crown } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ users: 0, keys: 0, activeKeys: 0, totalBalance: 0, pendingRequests: 0 });
+  const { isOwner } = useAuth();
+  const [stats, setStats] = useState({ users: 0, keys: 0, activeKeys: 0, totalBalance: 0, pendingRequests: 0, referralCodes: 0 });
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [usersRes, keysRes, activeKeysRes, balanceRes, pendingRes] = await Promise.all([
+      const [usersRes, keysRes, activeKeysRes, balanceRes, pendingRes, referralsRes] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('license_keys').select('id', { count: 'exact', head: true }),
         supabase.from('license_keys').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('profiles').select('wallet_balance'),
         supabase.from('wallet_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('referral_codes').select('id', { count: 'exact', head: true }),
       ]);
       const totalBalance = balanceRes.data?.reduce((s, p) => s + Number(p.wallet_balance), 0) || 0;
       setStats({
@@ -22,6 +25,7 @@ export default function AdminDashboard() {
         activeKeys: activeKeysRes.count || 0,
         totalBalance,
         pendingRequests: pendingRes.count || 0,
+        referralCodes: referralsRes.count || 0,
       });
     };
     fetchStats();
@@ -33,12 +37,16 @@ export default function AdminDashboard() {
     { title: 'Active Keys', value: stats.activeKeys, icon: <Key className="h-5 w-5" />, color: 'text-success' },
     { title: 'Total Balance', value: `₹${stats.totalBalance.toLocaleString('en-IN')}`, icon: <Wallet className="h-5 w-5" />, color: 'text-warning' },
     { title: 'Pending Requests', value: stats.pendingRequests, icon: <CreditCard className="h-5 w-5" />, color: 'text-destructive' },
+    { title: 'Referral Codes', value: stats.referralCodes, icon: <Gift className="h-5 w-5" />, color: 'text-info' },
   ];
 
   return (
     <div className="animate-fade-in">
-      <h1 className="page-header mb-6">Admin Dashboard</h1>
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="flex items-center gap-2 mb-6">
+        {isOwner && <Crown className="h-6 w-6 text-warning" />}
+        <h1 className="page-header">{isOwner ? 'Owner' : 'Admin'} Dashboard</h1>
+      </div>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         {cards.map(c => (
           <Card key={c.title} className="stat-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">

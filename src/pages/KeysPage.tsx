@@ -25,7 +25,7 @@ function generateKey(): string {
 }
 
 export default function KeysPage() {
-  const { user, role, profile, refreshProfile } = useAuth();
+  const { user, role, profile, refreshProfile, isAdminOrOwner } = useAuth();
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -42,7 +42,7 @@ export default function KeysPage() {
 
   const fetchKeys = async () => {
     let query = supabase.from('license_keys').select('*').order('created_at', { ascending: false });
-    if (role === 'reseller') query = query.eq('created_by', user!.id);
+    if (!isAdminOrOwner) query = query.eq('created_by', user!.id);
     const { data } = await query;
     if (data) setKeys(data);
   };
@@ -74,7 +74,7 @@ export default function KeysPage() {
       return;
     }
 
-    if (role !== 'admin') {
+    if (!isAdminOrOwner) {
       const totalCost = calcKeyCost(count, deviceLimit);
       const currentBalance = Number(profile?.wallet_balance || 0);
       if (currentBalance < totalCost) {
@@ -169,7 +169,7 @@ export default function KeysPage() {
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h1 className="page-header">License Keys</h1>
           <div className="flex flex-wrap gap-2">
-            {(role === 'admin' || role === 'reseller') && (
+            {(isAdminOrOwner || role === 'reseller') && (
               <Button onClick={() => setGenerateOpen(true)}><Plus className="mr-2 h-4 w-4" />Generate Keys</Button>
             )}
             <Button variant="outline" size="sm" onClick={exportCSV}><Download className="mr-2 h-4 w-4" />CSV</Button>
@@ -236,13 +236,13 @@ export default function KeysPage() {
                   <TableCell>
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" onClick={() => copyKey(k.key)} title="Copy key"><Copy className="h-4 w-4" /></Button>
-                      {(role === 'admin' || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
+                      {(isAdminOrOwner || role === 'reseller') && (k.status === 'active' || k.status === 'unused') && (
                         <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeactivate(k.id)} title="Revoke"><Ban className="h-4 w-4" /></Button>
                       )}
-                      {(role === 'admin' || role === 'reseller') && k.status === 'revoked' && (
+                      {(isAdminOrOwner || role === 'reseller') && k.status === 'revoked' && (
                         <Button size="sm" variant="ghost" className="text-primary" onClick={() => handleReactivate(k)} title="Reactivate"><RotateCcw className="h-4 w-4" /></Button>
                       )}
-                      {role === 'admin' && (
+                      {isAdminOrOwner && (
                         <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDeleteKey(k.id)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
                       )}
                     </div>
@@ -301,7 +301,7 @@ export default function KeysPage() {
                 </SelectContent>
               </Select>
             </div>
-            {role !== 'admin' && (
+            {!isAdminOrOwner && (
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <p className="text-sm font-medium">
                   Cost: ₹{calcKeyCost(useCustomKey ? 1 : (parseInt(genCount) || 1), parseInt(genDeviceLimit) || 1).toLocaleString('en-IN')}

@@ -11,6 +11,10 @@ interface AuthContextType {
   role: AppRole | null;
   profile: Database['public']['Tables']['profiles']['Row'] | null;
   loading: boolean;
+  isOwner: boolean;
+  isAdmin: boolean;
+  isAdminOrOwner: boolean;
+  isReseller: boolean;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -82,8 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchUserData(user.id);
   };
 
+  const isOwner = role === 'owner';
+  const isAdmin = role === 'admin';
+  const isAdminOrOwner = role === 'owner' || role === 'admin';
+  const isReseller = role === 'reseller';
+
   return (
-    <AuthContext.Provider value={{ user, session, role, profile, loading, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, role, profile, loading, isOwner, isAdmin, isAdminOrOwner, isReseller, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

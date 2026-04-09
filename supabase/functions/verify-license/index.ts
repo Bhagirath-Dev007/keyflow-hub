@@ -25,6 +25,22 @@ serve(async (req) => {
       });
     }
 
+    // Check mod config master switch
+    const { data: modConfig } = await supabase
+      .from('mod_config')
+      .select('*')
+      .eq('app_name', app_name)
+      .single();
+
+    if (modConfig && !modConfig.master_switch) {
+      return new Response(JSON.stringify({
+        valid: false,
+        error: 'Mod is currently offline',
+        status_text: modConfig.status_text,
+        mod_name: modConfig.mod_name,
+      }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const { data: keyData, error: findErr } = await supabase
       .from('license_keys')
       .select('*')
@@ -37,7 +53,6 @@ serve(async (req) => {
       });
     }
 
-    // Check app_name match
     if (keyData.app_name !== app_name) {
       return new Response(JSON.stringify({ valid: false, error: `This key is for "${keyData.app_name}", not "${app_name}"` }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -59,6 +74,26 @@ serve(async (req) => {
     const deviceLimit = keyData.device_limit || 1;
     const deviceIds: string[] = keyData.device_ids || [];
 
+    // Fetch features for this app
+    const { data: features } = await supabase
+      .from('features')
+      .select('name, enabled')
+      .eq('app_name', app_name);
+
+    const featureFlags = (features || []).reduce((acc: Record<string, boolean>, f: any) => {
+      acc[f.name] = f.enabled;
+      return acc;
+    }, {});
+
+    const baseResponse = {
+      plan: keyData.plan_name,
+      app_name: keyData.app_name,
+      device_limit: deviceLimit,
+      features: featureFlags,
+      mod_name: modConfig?.mod_name || '',
+      status_text: modConfig?.status_text || '',
+    };
+
     // If unused, activate and bind first device
     if (keyData.status === 'unused') {
       const now = new Date();
@@ -73,20 +108,16 @@ serve(async (req) => {
       }).eq('id', keyData.id);
 
       return new Response(JSON.stringify({
-        valid: true,
-        status: 'active',
-        plan: keyData.plan_name,
-        app_name: keyData.app_name,
+        valid: true, status: 'active',
+        ...baseResponse,
         expires_at: expiry.toISOString(),
-        device_limit: deviceLimit,
         devices_used: 1,
         message: 'Key activated and bound to device'
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // If active, check multi-device binding and expiry
+    // If active
     if (keyData.status === 'active') {
-      // Check expiry first
       if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
         await supabase.from('license_keys').update({ status: 'expired' }).eq('id', keyData.id);
         return new Response(JSON.stringify({ valid: false, error: 'Key has expired', status: 'expired' }), {
@@ -94,20 +125,15 @@ serve(async (req) => {
         });
       }
 
-      // Check if device is already registered
       if (deviceIds.includes(device_id)) {
         return new Response(JSON.stringify({
-          valid: true,
-          status: 'active',
-          plan: keyData.plan_name,
-          app_name: keyData.app_name,
+          valid: true, status: 'active',
+          ...baseResponse,
           expires_at: keyData.expires_at,
-          device_limit: deviceLimit,
           devices_used: deviceIds.length,
         }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Check if device limit reached
       if (deviceIds.length >= deviceLimit) {
         return new Response(JSON.stringify({
           valid: false,
@@ -117,26 +143,18 @@ serve(async (req) => {
         }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // Add new device
       const updatedDevices = [...deviceIds, device_id];
-      await supabase.from('license_keys').update({
-        device_ids: updatedDevices,
-        device_id,
-      }).eq('id', keyData.id);
+      await supabase.from('license_keys').update({ device_ids: updatedDevices, device_id }).eq('id', keyData.id);
 
       return new Response(JSON.stringify({
-        valid: true,
-        status: 'active',
-        plan: keyData.plan_name,
-        app_name: keyData.app_name,
+        valid: true, status: 'active',
+        ...baseResponse,
         expires_at: keyData.expires_at,
-        device_limit: deviceLimit,
         devices_used: updatedDevices.length,
         message: 'Device registered successfully',
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Expired
     return new Response(JSON.stringify({ valid: false, error: 'Key has expired', status: 'expired' }), {
       status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

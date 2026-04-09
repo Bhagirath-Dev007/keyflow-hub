@@ -21,7 +21,7 @@ interface UserWithRole extends Profile {
 }
 
 export default function UsersPage() {
-  const { role } = useAuth();
+  const { role, isOwner, isAdminOrOwner } = useAuth();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -44,7 +44,7 @@ export default function UsersPage() {
     }
   };
 
-  useEffect(() => { if (role === 'admin') fetchUsers(); }, [role]);
+  useEffect(() => { if (isAdminOrOwner) fetchUsers(); }, [isAdminOrOwner]);
 
   const filtered = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -82,6 +82,15 @@ export default function UsersPage() {
 
   const handleRoleUpdate = async () => {
     if (!roleDialog.user) return;
+    // Only owner can assign admin role
+    if (newRole === 'admin' && !isOwner) {
+      toast({ title: 'Only Owner can assign Admin role', variant: 'destructive' });
+      return;
+    }
+    if (newRole === 'owner' && !isOwner) {
+      toast({ title: 'Only Owner can assign Owner role', variant: 'destructive' });
+      return;
+    }
     const { error } = await supabase.from('user_roles').update({ role: newRole }).eq('user_id', roleDialog.user.user_id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Role updated' });
@@ -116,7 +125,15 @@ export default function UsersPage() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'users.csv'; a.click();
   };
 
-  if (role !== 'admin') return <DashboardLayout><p>Access denied</p></DashboardLayout>;
+  const roleBadgeVariant = (r: AppRole) => {
+    switch (r) {
+      case 'owner': return 'default' as const;
+      case 'admin': return 'secondary' as const;
+      default: return 'outline' as const;
+    }
+  };
+
+  if (!isAdminOrOwner) return <DashboardLayout><p>Access denied</p></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -135,6 +152,7 @@ export default function UsersPage() {
             <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="owner">Owner</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="reseller">Reseller</SelectItem>
             </SelectContent>
@@ -158,7 +176,7 @@ export default function UsersPage() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name || '—'}</TableCell>
                   <TableCell>{u.email}</TableCell>
-                  <TableCell><Badge variant="secondary" className="capitalize">{u.role}</Badge></TableCell>
+                  <TableCell><Badge variant={roleBadgeVariant(u.role)} className="capitalize">{u.role}</Badge></TableCell>
                   <TableCell className="font-mono">₹{Number(u.wallet_balance).toLocaleString('en-IN')}</TableCell>
                   <TableCell>
                     <Badge variant={u.is_banned ? 'destructive' : 'default'}>{u.is_banned ? 'Banned' : 'Active'}</Badge>
@@ -221,6 +239,7 @@ export default function UsersPage() {
               <SelectContent>
                 <SelectItem value="reseller">Reseller</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                {isOwner && <SelectItem value="owner">Owner</SelectItem>}
               </SelectContent>
             </Select>
           </div>

@@ -4,17 +4,35 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Key, Wallet, Users, Settings, LogOut,
-  FileText, BarChart3, KeyRound, Shield, Menu, X, CreditCard, Paintbrush
+  FileText, BarChart3, KeyRound, Shield, Menu, X, CreditCard,
+  Paintbrush, Gift, ToggleLeft, Gamepad2, Crown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface NavItem { label: string; href: string; icon: ReactNode; }
+
+const ownerNav: NavItem[] = [
+  { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { label: 'Users', href: '/dashboard/users', icon: <Users className="h-4 w-4" /> },
+  { label: 'License Keys', href: '/dashboard/keys', icon: <Key className="h-4 w-4" /> },
+  { label: 'Pricing', href: '/dashboard/pricing', icon: <Settings className="h-4 w-4" /> },
+  { label: 'Referral Codes', href: '/dashboard/referrals', icon: <Gift className="h-4 w-4" /> },
+  { label: 'Features', href: '/dashboard/features', icon: <ToggleLeft className="h-4 w-4" /> },
+  { label: 'Mod Config', href: '/dashboard/mod-config', icon: <Gamepad2 className="h-4 w-4" /> },
+  { label: 'Wallet Requests', href: '/dashboard/wallet-requests', icon: <CreditCard className="h-4 w-4" /> },
+  { label: 'Transactions', href: '/dashboard/transactions', icon: <FileText className="h-4 w-4" /> },
+  { label: 'Activity Logs', href: '/dashboard/logs', icon: <BarChart3 className="h-4 w-4" /> },
+  { label: 'Settings', href: '/dashboard/admin-settings', icon: <Paintbrush className="h-4 w-4" /> },
+];
 
 const adminNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Users', href: '/dashboard/users', icon: <Users className="h-4 w-4" /> },
   { label: 'License Keys', href: '/dashboard/keys', icon: <Key className="h-4 w-4" /> },
   { label: 'Pricing', href: '/dashboard/pricing', icon: <Settings className="h-4 w-4" /> },
+  { label: 'Referral Codes', href: '/dashboard/referrals', icon: <Gift className="h-4 w-4" /> },
+  { label: 'Features', href: '/dashboard/features', icon: <ToggleLeft className="h-4 w-4" /> },
+  { label: 'Mod Config', href: '/dashboard/mod-config', icon: <Gamepad2 className="h-4 w-4" /> },
   { label: 'Wallet Requests', href: '/dashboard/wallet-requests', icon: <CreditCard className="h-4 w-4" /> },
   { label: 'Transactions', href: '/dashboard/transactions', icon: <FileText className="h-4 w-4" /> },
   { label: 'Activity Logs', href: '/dashboard/logs', icon: <BarChart3 className="h-4 w-4" /> },
@@ -31,18 +49,22 @@ const resellerNav: NavItem[] = [
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { role, profile, signOut } = useAuth();
+  const { role, profile, signOut, isOwner } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const nav = role === 'admin' ? adminNav : resellerNav;
-  const panelName = profile?.panel_name || 'Naruto Panel';
+  const nav = role === 'owner' ? ownerNav : role === 'admin' ? adminNav : resellerNav;
+  const panelName = profile?.panel_name || 'Owner Panel';
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
   };
+
+  const roleIcon = isOwner
+    ? <Crown className="h-4 w-4 text-warning" />
+    : <Shield className="h-4 w-4 text-sidebar-accent-foreground" />;
 
   const sidebarContent = (
     <>
@@ -82,7 +104,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <div className="border-t border-sidebar-border p-4">
         <div className="mb-3 flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent">
-            <Shield className="h-4 w-4 text-sidebar-accent-foreground" />
+            {roleIcon}
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-sidebar-foreground">{profile?.name || profile?.email}</p>
@@ -98,7 +120,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Mobile header */}
       <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-sidebar border-b border-sidebar-border p-3 md:hidden">
         <div className="flex items-center gap-2">
           {profile?.logo_url ? (
@@ -115,7 +136,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
@@ -125,7 +145,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Desktop sidebar */}
       <aside className="fixed left-0 top-0 z-30 hidden md:flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
         {sidebarContent}
       </aside>

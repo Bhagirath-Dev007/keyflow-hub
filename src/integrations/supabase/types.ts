@@ -62,6 +62,33 @@ export type Database = {
         }
         Relationships: []
       }
+      features: {
+        Row: {
+          app_name: string
+          created_at: string
+          enabled: boolean
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          app_name: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          app_name?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       license_keys: {
         Row: {
           activated_at: string | null
@@ -110,6 +137,36 @@ export type Database = {
           key?: string
           plan_name?: string
           status?: Database["public"]["Enums"]["key_status"]
+        }
+        Relationships: []
+      }
+      mod_config: {
+        Row: {
+          app_name: string
+          created_at: string
+          id: string
+          master_switch: boolean
+          mod_name: string
+          status_text: string
+          updated_at: string
+        }
+        Insert: {
+          app_name: string
+          created_at?: string
+          id?: string
+          master_switch?: boolean
+          mod_name?: string
+          status_text?: string
+          updated_at?: string
+        }
+        Update: {
+          app_name?: string
+          created_at?: string
+          id?: string
+          master_switch?: boolean
+          mod_name?: string
+          status_text?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -181,6 +238,74 @@ export type Database = {
           wallet_balance?: number
         }
         Relationships: []
+      }
+      referral_codes: {
+        Row: {
+          bonus_balance: number
+          code: string
+          created_at: string
+          created_by: string
+          current_uses: number
+          expiration_days: number
+          id: string
+          level: Database["public"]["Enums"]["app_role"]
+          max_uses: number
+          updated_at: string
+        }
+        Insert: {
+          bonus_balance?: number
+          code: string
+          created_at?: string
+          created_by: string
+          current_uses?: number
+          expiration_days?: number
+          id?: string
+          level?: Database["public"]["Enums"]["app_role"]
+          max_uses?: number
+          updated_at?: string
+        }
+        Update: {
+          bonus_balance?: number
+          code?: string
+          created_at?: string
+          created_by?: string
+          current_uses?: number
+          expiration_days?: number
+          id?: string
+          level?: Database["public"]["Enums"]["app_role"]
+          max_uses?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      referral_uses: {
+        Row: {
+          created_at: string
+          id: string
+          referral_code_id: string
+          used_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          referral_code_id: string
+          used_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          referral_code_id?: string
+          used_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_uses_referral_code_id_fkey"
+            columns: ["referral_code_id"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {

@@ -12,21 +12,39 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { code, user_id } = await req.json();
+    // Verify JWT - extract user from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-    if (!code || !user_id) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing code or user_id' }), {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const userId = user.id; // Use authenticated user's ID, never trust client-supplied
+
+    const { code } = await req.json();
+
+    if (!code) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing code' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     // Find the referral code
-    const { data: referral, error: findErr } = await supabase
+    const { data: referral, error: findErr } = await supabaseAdmin
       .from('referral_codes')
       .select('*')
       .eq('code', code.toUpperCase())
@@ -46,11 +64,11 @@ serve(async (req) => {
     }
 
     // Check if user already used this code
-    const { data: existingUse } = await supabase
+    const { data: existingUse } = await supabaseAdmin
       .from('referral_uses')
       .select('id')
       .eq('referral_code_id', referral.id)
-      .eq('used_by', user_id)
+      .eq('used_by', userId)
       .single();
 
     if (existingUse) {
@@ -61,18 +79,18 @@ serve(async (req) => {
 
     // Apply bonus balance
     if (referral.bonus_balance > 0) {
-      const { data: profile } = await supabase
+      const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('wallet_balance')
-        .eq('user_id', user_id)
+        .eq('user_id', userId)
         .single();
 
       if (profile) {
         const newBalance = Number(profile.wallet_balance) + Number(referral.bonus_balance);
-        await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', user_id);
+        await supabaseAdmin.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', userId);
 
-        await supabase.from('transactions').insert({
-          user_id,
+        await supabaseAdmin.from('transactions').insert({
+          user_id: userId,
           amount: referral.bonus_balance,
           type: 'credit',
           source: 'system',
@@ -82,13 +100,13 @@ serve(async (req) => {
     }
 
     // Record usage
-    await supabase.from('referral_uses').insert({
+    await supabaseAdmin.from('referral_uses').insert({
       referral_code_id: referral.id,
-      used_by: user_id,
+      used_by: userId,
     });
 
     // Increment usage count
-    await supabase.from('referral_codes').update({
+    await supabaseAdmin.from('referral_codes').update({
       current_uses: referral.current_uses + 1,
     }).eq('id', referral.id);
 

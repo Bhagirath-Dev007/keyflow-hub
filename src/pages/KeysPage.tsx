@@ -65,15 +65,15 @@ export default function KeysPage() {
       toast({ title: 'Plan name and App name are required', variant: 'destructive' });
       return;
     }
-    const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
-    const duration = parseInt(genDuration) || 30;
-    const deviceLimit = parseInt(genDeviceLimit) || 1;
-
     if (useCustomKey && !genCustomKey.trim()) {
       toast({ title: 'Please enter a custom key', variant: 'destructive' });
       return;
     }
 
+    const count = useCustomKey ? 1 : (parseInt(genCount) || 1);
+    const deviceLimit = parseInt(genDeviceLimit) || 1;
+
+    // Client-side balance pre-check (server enforces the real check)
     if (!isAdminOrOwner) {
       const totalCost = calcKeyCost(count, deviceLimit);
       const currentBalance = Number(profile?.wallet_balance || 0);
@@ -81,36 +81,29 @@ export default function KeysPage() {
         toast({ title: 'Insufficient wallet balance', description: `Need ₹${totalCost}, you have ₹${currentBalance}`, variant: 'destructive' });
         return;
       }
-
-      const newBalance = currentBalance - totalCost;
-      await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', user!.id);
-      await supabase.from('transactions').insert({
-        user_id: user!.id,
-        amount: totalCost,
-        type: 'debit' as const,
-        source: 'purchase' as const,
-        note: `Generated ${count}x ${genPlan} key(s) (${deviceLimit} device${deviceLimit > 1 ? 's' : ''})`,
-      });
-      refreshProfile();
     }
 
-    const newKeys = Array.from({ length: count }, () => ({
-      key: useCustomKey ? genCustomKey.trim() : generateKey(),
-      plan_name: genPlan,
-      duration_days: duration,
-      created_by: user!.id,
-      device_limit: deviceLimit,
-      app_name: genAppName.trim().toUpperCase(),
-    }));
+    // Call server-side edge function for secure key generation + wallet deduction
+    const { data, error } = await supabase.functions.invoke('generate-keys', {
+      body: {
+        plan_name: genPlan,
+        app_name: genAppName.trim(),
+        duration_days: parseInt(genDuration) || 30,
+        count,
+        device_limit: deviceLimit,
+        custom_key: useCustomKey ? genCustomKey.trim() : undefined,
+      },
+    });
 
-    const { error } = await supabase.from('license_keys').insert(newKeys as any);
-    if (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error || data?.error) {
+      toast({ title: 'Error', description: data?.error || error?.message || 'Failed to generate keys', variant: 'destructive' });
       return;
     }
-    toast({ title: `${count} key(s) generated` });
+
+    toast({ title: `${data.count} key(s) generated` });
     setGenerateOpen(false);
     setGenPlan(''); setGenCount('1'); setGenCustomKey(''); setUseCustomKey(false); setGenDeviceLimit('1'); setGenAppName('');
+    refreshProfile();
     fetchKeys();
   };
 

@@ -393,6 +393,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_wallet_request: {
+        Args: { _admin_note?: string; _request_id: string }
+        Returns: number
+      }
+      deduct_wallet_balance: {
+        Args: { _amount: number; _user_id: string }
+        Returns: number
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -403,6 +411,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      reject_wallet_request: {
+        Args: { _admin_note?: string; _request_id: string }
+        Returns: undefined
       }
     }
     Enums: {

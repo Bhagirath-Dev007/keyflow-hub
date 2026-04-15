@@ -75,50 +75,22 @@ serve(async (req) => {
 
     const isAdminOrOwner = role === 'owner' || role === 'admin';
 
-    // For resellers: enforce server-side wallet deduction
+    // For resellers: enforce server-side atomic wallet deduction
     if (!isAdminOrOwner) {
       const totalCost = numCount * (10 + numDeviceLimit * 20);
 
-      // Get current balance
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('wallet_balance, is_banned')
-        .eq('user_id', user.id)
-        .single();
+      // Use atomic RPC to deduct balance (prevents race conditions)
+      const { data: newBalance, error: deductError } = await supabaseAdmin
+        .rpc('deduct_wallet_balance', { _user_id: user.id, _amount: totalCost });
 
-      if (!profile) {
-        return new Response(JSON.stringify({ error: 'Profile not found' }), {
-          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      if (profile.is_banned) {
-        return new Response(JSON.stringify({ error: 'Account is banned' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      const currentBalance = Number(profile.wallet_balance);
-      if (currentBalance < totalCost) {
-        return new Response(JSON.stringify({ 
-          error: 'Insufficient wallet balance',
-          required: totalCost,
-          available: currentBalance 
-        }), {
+      if (deductError) {
+        const msg = deductError.message.includes('Insufficient') 
+          ? 'Insufficient wallet balance' 
+          : deductError.message.includes('banned')
+          ? 'Account is banned'
+          : 'Failed to deduct balance';
+        return new Response(JSON.stringify({ error: msg }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Atomically deduct balance
-      const newBalance = currentBalance - totalCost;
-      const { error: updateErr } = await supabaseAdmin
-        .from('profiles')
-        .update({ wallet_balance: newBalance })
-        .eq('user_id', user.id);
-
-      if (updateErr) {
-        return new Response(JSON.stringify({ error: 'Failed to deduct balance' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
@@ -148,20 +120,10 @@ serve(async (req) => {
       .select('id, key, plan_name, duration_days, device_limit, app_name, status');
 
     if (insertErr) {
-      // If key insertion fails and we already deducted, refund
+      // If key insertion fails and we already deducted, refund atomically
       if (!isAdminOrOwner) {
         const totalCost = numCount * (10 + numDeviceLimit * 20);
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('wallet_balance')
-          .eq('user_id', user.id)
-          .single();
-        if (profile) {
-          await supabaseAdmin
-            .from('profiles')
-            .update({ wallet_balance: Number(profile.wallet_balance) + totalCost })
-            .eq('user_id', user.id);
-        }
+        await supabaseAdmin.rpc('deduct_wallet_balance', { _user_id: user.id, _amount: -totalCost });
       }
       return new Response(JSON.stringify({ error: insertErr.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }

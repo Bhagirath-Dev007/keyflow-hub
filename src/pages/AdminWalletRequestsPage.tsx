@@ -57,20 +57,30 @@ export default function AdminWalletRequestsPage() {
   const handleAction = async () => {
     const req = actionDialog.request;
     if (!req) return;
-    const newStatus = actionDialog.action === 'approve' ? 'approved' : 'rejected';
-    await supabase.from('wallet_requests').update({ status: newStatus, admin_note: adminNote }).eq('id', req.id);
+
     if (actionDialog.action === 'approve') {
-      const profile = requests.find(r => r.id === req.id)?.profile;
-      if (profile) {
-        const newBalance = Number(profile.wallet_balance) + Number(req.amount);
-        await supabase.from('profiles').update({ wallet_balance: newBalance }).eq('user_id', req.user_id);
-        await supabase.from('transactions').insert({
-          user_id: req.user_id, amount: req.amount, type: 'credit' as const, source: 'admin' as const,
-          note: `Balance request approved (₹${(Number(req.amount) / 200).toLocaleString('en-IN')} paid)${adminNote ? ': ' + adminNote : ''}`,
-        });
+      // Use atomic RPC to approve and credit in one transaction
+      const { error } = await supabase.rpc('approve_wallet_request', {
+        _request_id: req.id,
+        _admin_note: adminNote,
+      });
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+    } else {
+      // Use atomic RPC to reject
+      const { error } = await supabase.rpc('reject_wallet_request', {
+        _request_id: req.id,
+        _admin_note: adminNote,
+      });
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
       }
     }
-    toast({ title: `Request ${newStatus}` });
+
+    toast({ title: `Request ${actionDialog.action === 'approve' ? 'approved' : 'rejected'}` });
     setActionDialog({ open: false, request: null, action: 'approve' });
     setAdminNote('');
     fetchRequests();
